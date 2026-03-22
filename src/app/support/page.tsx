@@ -79,7 +79,8 @@ function SupportPageInner() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error ?? data.detail ?? "送信に失敗しました");
+        throw new Error(data.detail ?? data.error ?? "送信に失敗しました");
+
       }
 
       // ★ 振込コードはAPIルートから受け取る（increment_transfer_counter）

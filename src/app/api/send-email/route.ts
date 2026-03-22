@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+undefinedimport { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
@@ -33,25 +33,23 @@ export async function POST(req: NextRequest) {
 
     const code = await generateTransferCode();
 
-    // ── ★ Supabaseへ保存（ここが新規追加） ──
+    // ── Supabaseへ保存 ──
     const { error: insertError } = await supabase.from('supporters').insert({
-      name:           supporterName,
-      email:          supporterEmail,
-      tier:           tier,
-      units:          Number(units),
-      total_amount:   Number(totalAmount),
-      transfer_code:  code,
-      status:         'pending',
-      project_title:  projectTitle || '北海道バドミントン支援クラファン Vol.1',
-      message:        message || '',
+      project_id:    1,
+      name:          supporterName,
+      email:         supporterEmail,
+      tier:          tier,
+      units:         Number(units),
+      amount:        Number(totalAmount),
+      transfer_code: code,
+      status:        'pending',
+      message:       message || '',
     });
     if (insertError) {
       console.error('Supabase保存エラー:', insertError.message);
-      // 保存失敗でもメール送信は続行
     } else {
       console.log('Supabase保存成功 コード:', code);
     }
-    // ── ここまで追加 ──
 
     const dl = new Date();
     dl.setDate(dl.getDate() + 14);
@@ -64,6 +62,10 @@ export async function POST(req: NextRequest) {
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
+
+    // ── 接続テスト（デバッグ用） ──
+    await transporter.verify();
+    console.log('Gmail接続OK');
 
     const sHtml = `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;">
 <div style="background:linear-gradient(135deg,#0a1628,#1a3a5c);padding:28px;text-align:center;">
@@ -154,7 +156,7 @@ export async function POST(req: NextRequest) {
   <p>振込期限: <span style="color:#e74c3c;font-weight:700;">${dlStr}</span></p>
   ${message ? `<p>応援メッセージ: <em>${message}</em></p>` : ''}
   <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
-  <p style="color:#888;font-size:12px;">管理画面で承認・却下できます → <a href="https://sports-support-hokkaido.vercel.app/admin">管理画面を開く</a></p>
+  <p style="color:#888;font-size:12px;">管理画面で承認・却下できます → <a href="https://cloudfan.vercel.app/admin">管理画面を開く</a></p>
 </div>
 </div>`;
 
@@ -164,6 +166,7 @@ export async function POST(req: NextRequest) {
       subject: `【支援受付】管理番号 ${code} - ご支援ありがとうございます`,
       html: sHtml,
     });
+    console.log('支援者メール送信成功:', supporterEmail);
 
     await transporter.sendMail({
       from: `"BADMINTON SUPPORT HOKKAIDO" <${ADMIN_EMAIL}>`,
@@ -171,12 +174,16 @@ export async function POST(req: NextRequest) {
       subject: `【新規支援】${supporterName}様 ¥${Number(totalAmount).toLocaleString()} 番号:${code}`,
       html: aHtml,
     });
+    console.log('管理者メール送信成功:', ADMIN_EMAIL);
 
     return NextResponse.json({ success: true, transferCode: code });
 
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
     console.error('ERROR:', err?.message, err?.code);
-    return NextResponse.json({ error: 'メール送信失敗', detail: err?.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'メール送信失敗', detail: err?.message },
+      { status: 500 }
+    );
   }
 }
