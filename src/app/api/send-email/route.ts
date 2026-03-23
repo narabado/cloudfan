@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       email:         supporterEmail,
       tier:          tier,
       units:         Number(units),
-      amount:        Number(totalAmount),   // ← 修正：total_amount → amount（実際のカラム名）
+      total_amount:  Number(totalAmount),
       transfer_code: code,
       status:        'pending',
       message:       message || '',
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     </div>
   </div>
 
-  ${message ? `<div style="background:#f0f4ff;border-radius:8px;padding:16px;margin-bottom:20px;"><p style="margin:0 0 6px;font-size:12px;color:#888;">応援メッセージ</p><p style="margin:0;font-style:italic;font-size:14px;">"${message}"</p></div>` : ''}
+  \${message ? \`<div style="background:#f0f4ff;border-radius:8px;padding:16px;margin-bottom:20px;"><p style="margin:0 0 6px;font-size:12px;color:#888;">応援メッセージ</p><p style="margin:0;font-style:italic;font-size:14px;">"\${message}"</p></div>\` : ''}
 
   <div style="background:#e8f4fd;border-radius:8px;padding:20px;margin-bottom:20px;">
     <h3 style="margin:0 0 16px;font-size:14px;color:#1a3a5c;">✅ 入金確認後の流れ</h3>
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   <p>ランク: ${tier}サポーター</p>
   <p>金額: <strong style="color:#d4af37;">¥${Number(totalAmount).toLocaleString()}</strong>（${units}口）</p>
   <p>振込期限: <span style="color:#e74c3c;font-weight:700;">${dlStr}</span></p>
-  ${message ? `<p>応援メッセージ: <em>${message}</em></p>` : ''}
+  \${message ? \`<p>応援メッセージ: <em>\${message}</em></p>\` : ''}
   <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
   <p style="color:#888;font-size:12px;">管理画面で承認・却下できます → <a href="https://cloudfan.vercel.app/admin">管理画面を開く</a></p>
 </div>
