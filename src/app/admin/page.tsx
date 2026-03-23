@@ -1,542 +1,458 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-// =============================================
-// 型定義
-// =============================================
-type Supporter = {
-  id: number;
-  project_id: number;
-  project_title: string;
+// ==================== 型定義 ====================
+interface Supporter {
+  id: string;
+  project_id: string;
   name: string;
   email: string;
-  tier: string;
-  units: number;
-  total_amount: number;
-  transfer_code: string;
+  amount: number;
+  tier_name: string;
   status: string;
-  message: string;
+  message: string | null;
+  transfer_code: string | null;
   created_at: string;
-};
+}
 
-type Project = {
-  id: number;
-  school: string;
-  club: string;
+interface Project {
+  id: string;
   title: string;
   status: string;
-  images: string[];
+  goal_amount: number;
+  created_at: string;
+}
+
+// ==================== パスワード ====================
+const ADMIN_PASSWORD = "NBD3890";
+
+// ==================== ステータス判定ヘルパー ====================
+const isApproved  = (s: string) => ["approved", "承認", "承認済"].includes(s);
+const isPending   = (s: string) => ["pending", "未承認", "未処理", ""].includes(s);
+const isRejected  = (s: string) => ["rejected", "却下"].includes(s);
+const isCancelled = (s: string) => ["cancelled", "キャンセル"].includes(s);
+
+const statusLabel = (s: string) => {
+  if (isApproved(s))  return "✅ 承認済";
+  if (isPending(s))   return "⏳ 未承認";
+  if (isRejected(s))  return "❌ 却下";
+  if (isCancelled(s)) return "🚫 取消";
+  return s;
 };
 
-// =============================================
-// 定数
-// =============================================
-const ADMIN_PASSWORD = 'NBD3890';
+const statusColor = (s: string) => {
+  if (isApproved(s))  return "#16a34a";
+  if (isPending(s))   return "#d97706";
+  if (isRejected(s))  return "#dc2626";
+  if (isCancelled(s)) return "#6b7280";
+  return "#374151";
+};
 
-// =============================================
-// ステータス判定ヘルパー（日本語・英語両対応）
-// =============================================
-const isApproved  = (s: Supporter) =>
-  s.status === 'approved' || s.status === '承認' || s.status === '承認済';
-const isPending   = (s: Supporter) =>
-  s.status === 'pending' || s.status === '未承認' || s.status === '' || s.status == null;
-const isRejected  = (s: Supporter) =>
-  s.status === 'rejected' || s.status === '却下';
-const isCancelled = (s: Supporter) =>
-  s.status === 'cancelled' || s.status === 'キャンセル';
-
-// =============================================
-// メインコンポーネント
-// =============================================
+// ==================== メインコンポーネント ====================
 export default function AdminPage() {
-  const [authed,        setAuthed]        = useState(false);
-  const [pwInput,       setPwInput]       = useState('');
-  const [pwError,       setPwError]       = useState('');
-  const [supporters,    setSupporters]    = useState<Supporter[]>([]);
-  const [projects,      setProjects]      = useState<Project[]>([]);
-  const [loading,       setLoading]       = useState(true);
-  const [filter,        setFilter]        = useState<'all'|'pending'|'approved'|'rejected'>('all');
-  const [projectFilter, setProjectFilter] = useState<number|'all'>('all');
-  const [activeTab,     setActiveTab]     = useState<'supporters'|'projects'>('supporters');
+  const router = useRouter();
 
-  // セッションストレージで認証を保持
+  // ---- 認証 ----
+  const [authed, setAuthed]     = useState(false);
+  const [pwInput, setPwInput]   = useState("");
+  const [pwError, setPwError]   = useState("");
+
+  // ---- データ ----
+  const [supporters, setSupporters] = useState<Supporter[]>([]);
+  const [projects,   setProjects]   = useState<Project[]>([]);
+  const [loading,    setLoading]    = useState(false);
+
+  // ---- UI ----
+  const [tab,       setTab]       = useState<"supporters" | "projects">("supporters");
+  const [filterPrj, setFilterPrj] = useState("all");
+  const [filterSts, setFilterSts] = useState("all");
+
+  // ---- セッション確認（マウント時）----
   useEffect(() => {
-    if (sessionStorage.getItem('admin_authed') === 'true') setAuthed(true);
+    const saved = sessionStorage.getItem("admin_authed");
+    if (saved === "true") {
+      setAuthed(true);
+    }
   }, []);
 
+  // ---- 認証後にデータ取得 ----
   useEffect(() => {
     if (authed) fetchAll();
   }, [authed]);
 
-  // =============================================
-  // 認証
-  // =============================================
-  const handleLogin = () => {
-    if (pwInput === ADMIN_PASSWORD) {
-      sessionStorage.setItem('admin_authed', 'true');
-      setAuthed(true);
-      setPwError('');
-    } else {
-      setPwError('パスワードが違います');
-      setPwInput('');
+  // ---- データ取得 ----
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const [{ data: sup }, { data: prj }] = await Promise.all([
+        supabase.from("supporters").select("*").order("created_at", { ascending: false }),
+        supabase.from("crowdfunding_projects").select("*").order("created_at", { ascending: false }),
+      ]);
+      setSupporters(sup ?? []);
+      setProjects(prj ?? []);
+    } catch (e) {
+      console.error("データ取得エラー:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ---- ログイン処理 ----
+  const handleLogin = () => {
+    if (pwInput === ADMIN_PASSWORD) {
+      sessionStorage.setItem("admin_authed", "true");
+      setAuthed(true);
+      setPwError("");
+    } else {
+      setPwError("パスワードが違います");
+    }
+  };
+
+  // ---- ログアウト ----
   const handleLogout = () => {
-    sessionStorage.removeItem('admin_authed');
+    sessionStorage.removeItem("admin_authed");
     setAuthed(false);
-    setPwInput('');
+    setPwInput("");
   };
 
-  // =============================================
-  // データ取得
-  // =============================================
-  const fetchAll = async () => {
-    setLoading(true);
-    const [{ data: sups }, { data: projs }] = await Promise.all([
-      supabase
-        .from('supporters')
-        .select('*')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('crowdfunding_projects')
-        .select('id,school,club,title,status,images')
-        .order('id'),
-    ]);
-    setSupporters(sups ?? []);
-    setProjects(projs ?? []);
-    setLoading(false);
+  // ---- ステータス更新 ----
+  const updateStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from("supporters").update({ status }).eq("id", id);
+    if (error) { alert("更新失敗: " + error.message); return; }
+    await fetchAll();
   };
 
-  // =============================================
-  // ステータス更新
-  // =============================================
-  const updateStatus = async (id: number, newStatus: 'approved' | 'rejected') => {
-    const { error } = await supabase
-      .from('supporters')
-      .update({ status: newStatus })
-      .eq('id', id);
-    if (error) { alert('更新に失敗しました'); return; }
-    fetchAll();
-  };
-
-  const cancelSupporter = async (id: number) => {
-    if (!confirm('この支援者を取消しますか？')) return;
-    await supabase.from('supporters').update({ status: 'cancelled' }).eq('id', id);
-    fetchAll();
-  };
-
-  // =============================================
-  // フィルタリング
-  // =============================================
-  const filtered = supporters.filter(s => {
-    const projectOk = projectFilter === 'all' ? true : s.project_id === projectFilter;
-    if (!projectOk) return false;
-    if (filter === 'all')      return true;
-    if (filter === 'pending')  return isPending(s);
-    if (filter === 'approved') return isApproved(s);
-    if (filter === 'rejected') return isRejected(s);
-    return true;
-  });
-
-  // 統計
-  const totalAmount  = supporters.filter(isApproved)
-    .reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
-  const pendingCount = supporters.filter(isPending).length;
-
-  // =============================================
-  // フィルターボタン件数カウント
-  // =============================================
-  const countFilter = (f: 'all'|'pending'|'approved'|'rejected') => {
-    return supporters.filter(s => {
-      const projectOk = projectFilter === 'all' ? true : s.project_id === projectFilter;
-      if (!projectOk) return false;
-      if (f === 'all')      return true;
-      if (f === 'pending')  return isPending(s);
-      if (f === 'approved') return isApproved(s);
-      if (f === 'rejected') return isRejected(s);
-      return true;
-    }).length;
-  };
-
-  // =============================================
-  // パスワード画面
-  // =============================================
+  // ==================== パスワード画面 ====================
   if (!authed) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#f8fafc',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #1e3a5f 0%, #2d6a4f 100%)",
       }}>
         <div style={{
-          background: '#fff', borderRadius: 16, padding: '3rem',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-          width: '100%', maxWidth: 380, textAlign: 'center',
+          background: "#fff",
+          borderRadius: 16,
+          padding: "48px 40px",
+          width: 360,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          textAlign: "center",
         }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🔐</div>
-          <h2 style={{ color: '#1a3a5c', marginBottom: '0.5rem', fontSize: 22 }}>管理画面</h2>
-          <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🔐</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, color: "#1e3a5f" }}>
+            管理者ページ
+          </h1>
+          <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 28 }}>
             パスワードを入力してください
           </p>
+
           <input
             type="password"
             value={pwInput}
-            onChange={e => setPwInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            onChange={(e) => setPwInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             placeholder="パスワード"
             style={{
-              width: '100%', padding: '0.9rem', borderRadius: 8,
-              border: pwError ? '2px solid #e55' : '1px solid #ddd',
-              fontSize: '1rem', marginBottom: '0.75rem', boxSizing: 'border-box',
-              textAlign: 'center', letterSpacing: '0.2em',
+              width: "100%",
+              padding: "12px 16px",
+              border: pwError ? "2px solid #dc2626" : "2px solid #d1d5db",
+              borderRadius: 8,
+              fontSize: 16,
+              outline: "none",
+              boxSizing: "border-box",
+              marginBottom: 8,
             }}
+            autoFocus
           />
+
           {pwError && (
-            <div style={{ color: '#e55', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-              ❌ {pwError}
-            </div>
+            <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>
+              {pwError}
+            </p>
           )}
+
           <button
             onClick={handleLogin}
             style={{
-              width: '100%', padding: '0.9rem', background: '#1a3a5c',
-              color: '#fff', border: 'none', borderRadius: 8,
-              fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
+              width: "100%",
+              padding: "12px",
+              background: "linear-gradient(135deg, #1e3a5f, #2d6a4f)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginTop: 8,
             }}
           >
             ログイン
           </button>
-          <div style={{ marginTop: '1rem' }}>
-            <Link href="/" style={{ color: '#888', fontSize: '0.85rem', textDecoration: 'none' }}>
-              ← サイトへ戻る
-            </Link>
-          </div>
         </div>
       </div>
     );
   }
 
-  // =============================================
-  // 読み込み中
-  // =============================================
-  if (loading) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
-        読み込み中...
-      </div>
-    );
-  }
+  // ==================== 管理画面（認証後）====================
 
-  // =============================================
-  // 管理画面本体
-  // =============================================
+  // 統計
+  const approvedSupporters = supporters.filter(s => isApproved(s.status));
+  const pendingSupporters  = supporters.filter(s => isPending(s.status));
+  const totalAmount        = approvedSupporters.reduce((sum, s) => sum + (s.amount || 0), 0);
+
+  // フィルター
+  const filtered = supporters.filter(s => {
+    const prjMatch = filterPrj === "all" || s.project_id === filterPrj;
+    const stsMatch =
+      filterSts === "all"       ? true :
+      filterSts === "approved"  ? isApproved(s.status) :
+      filterSts === "pending"   ? isPending(s.status)  :
+      filterSts === "rejected"  ? isRejected(s.status) :
+      filterSts === "cancelled" ? isCancelled(s.status) : true;
+    return prjMatch && stsMatch;
+  });
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
 
-      {/* ── ヘッダー ── */}
-      <nav style={{
-        background: 'linear-gradient(135deg,#1a3a5c,#2d6a9f)',
-        color: '#fff', padding: '1rem 2rem',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      {/* ヘッダー */}
+      <div style={{
+        background: "linear-gradient(135deg, #1e3a5f 0%, #2d6a4f 100%)",
+        color: "#fff",
+        padding: "16px 32px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
       }}>
-        <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>⛅ CloudFan 管理画面</div>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Link href="/admin/project-edit" style={{
-            padding: '0.4rem 1rem', background: '#f0a500',
-            color: '#fff', borderRadius: 6,
-            textDecoration: 'none', fontSize: '0.85rem', fontWeight: 'bold',
-          }}>
-            ＋ 新規プロジェクト
-          </Link>
-          <Link href="/" style={{
-            padding: '0.4rem 1rem', background: 'rgba(255,255,255,0.2)',
-            color: '#fff', borderRadius: 6,
-            textDecoration: 'none', fontSize: '0.85rem',
-          }}>
-            🏠 サイトへ戻る
-          </Link>
-          <button onClick={handleLogout} style={{
-            padding: '0.4rem 1rem', background: 'rgba(255,255,255,0.15)',
-            color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: 6, fontSize: '0.85rem', cursor: 'pointer',
-          }}>
-            🔓 ログアウト
-          </button>
-        </div>
-      </nav>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>⚙️ 管理者ダッシュボード</h1>
+        <button
+          onClick={handleLogout}
+          style={{
+            background: "rgba(255,255,255,0.2)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.4)",
+            borderRadius: 8,
+            padding: "8px 16px",
+            cursor: "pointer",
+            fontSize: 14,
+          }}
+        >
+          ログアウト
+        </button>
+      </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem' }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px" }}>
 
-        {/* ── 統計カード ── */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
-          gap: '1rem', marginBottom: '2rem',
-        }}>
-          {[
-            { label: '総支援金額（承認済）', value: `¥${totalAmount.toLocaleString()}`,    color: '#2d6a9f' },
-            { label: '全支援者数',           value: `${supporters.length}名`,               color: '#28a745' },
-            { label: '承認待ち',             value: `${pendingCount}件`,                    color: pendingCount > 0 ? '#e55' : '#888' },
-            { label: 'プロジェクト数',       value: `${projects.length}件`,                 color: '#f0a500' },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={{
-              background: '#fff', borderRadius: 10, padding: '1.25rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color }}>{value}</div>
-              <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>{label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── タブ ── */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          {[
-            { key: 'supporters', label: '👥 支援者管理' },
-            { key: 'projects',   label: '🏆 プロジェクト管理' },
-          ].map(({ key, label }) => (
-            <button key={key} onClick={() => setActiveTab(key as 'supporters'|'projects')} style={{
-              padding: '0.6rem 1.25rem', borderRadius: 8,
-              border: 'none', cursor: 'pointer',
-              background: activeTab === key ? '#1a3a5c' : '#e0e0e0',
-              color: activeTab === key ? '#fff' : '#333',
-              fontWeight: 'bold',
-            }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ══════════════════════════════════
-            支援者管理タブ
-        ══════════════════════════════════ */}
-        {activeTab === 'supporters' && (
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 80, fontSize: 18, color: "#6b7280" }}>
+            読み込み中...
+          </div>
+        ) : (
           <>
-            {/* フィルター */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-              {/* プロジェクト選択 */}
-              <select
-                value={projectFilter}
-                onChange={e => setProjectFilter(
-                  e.target.value === 'all' ? 'all' : Number(e.target.value)
-                )}
-                style={{ padding: '0.5rem 1rem', borderRadius: 6, border: '1px solid #ddd' }}
-              >
-                <option value="all">全プロジェクト</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.school} {p.club}</option>
-                ))}
-              </select>
-
-              {/* ステータスフィルター */}
-              {(['all','pending','approved','rejected'] as const).map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{
-                  padding: '0.5rem 1rem', borderRadius: 6,
-                  border: 'none', cursor: 'pointer',
-                  background: filter === f ? '#1a3a5c' : '#e0e0e0',
-                  color: filter === f ? '#fff' : '#333',
+            {/* 統計カード */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
+              {[
+                { label: "総承認支援額", value: `¥${totalAmount.toLocaleString()}`, color: "#1e3a5f" },
+                { label: "承認済支援者", value: `${approvedSupporters.length}名`, color: "#2d6a4f" },
+                { label: "未承認支援者", value: `${pendingSupporters.length}名`, color: "#d97706" },
+                { label: "プロジェクト数", value: `${projects.length}件`, color: "#7c3aed" },
+              ].map((card) => (
+                <div key={card.label} style={{
+                  background: "#fff",
+                  borderRadius: 12,
+                  padding: "20px 24px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  borderLeft: `4px solid ${card.color}`,
                 }}>
-                  {f === 'all'      ? 'すべて'
-                   : f === 'pending'  ? '⏳ 未承認'
-                   : f === 'approved' ? '✅ 承認済'
-                   : '❌ 却下'}
-                  {' '}({countFilter(f)})
+                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{card.label}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: card.color }}>{card.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* タブ */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              {(["supporters", "projects"] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    padding: "10px 24px",
+                    borderRadius: 8,
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    background: tab === t ? "#1e3a5f" : "#e5e7eb",
+                    color: tab === t ? "#fff" : "#374151",
+                  }}
+                >
+                  {t === "supporters" ? "👥 支援者管理" : "📋 プロジェクト管理"}
                 </button>
               ))}
             </div>
 
-            {filtered.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
-                該当する支援者がいません
+            {/* ===== 支援者タブ ===== */}
+            {tab === "supporters" && (
+              <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+
+                {/* フィルター */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+                  <select value={filterPrj} onChange={e => setFilterPrj(e.target.value)}
+                    style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13 }}>
+                    <option value="all">すべてのプロジェクト</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                  </select>
+                  <select value={filterSts} onChange={e => setFilterSts(e.target.value)}
+                    style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13 }}>
+                    <option value="all">すべてのステータス</option>
+                    <option value="pending">⏳ 未承認</option>
+                    <option value="approved">✅ 承認済</option>
+                    <option value="rejected">❌ 却下</option>
+                    <option value="cancelled">🚫 取消</option>
+                  </select>
+                </div>
+
+                {/* テーブル */}
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "#f1f5f9" }}>
+                        {["日時", "名前", "プロジェクト", "コース", "金額", "ステータス", "振込コード", "操作"].map(h => (
+                          <th key={h} style={{ padding: "10px 12px", textAlign: "left", color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.length === 0 ? (
+                        <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>データがありません</td></tr>
+                      ) : filtered.map(s => {
+                        const prjName = projects.find(p => p.id === s.project_id)?.title ?? s.project_id;
+                        return (
+                          <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "10px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                              {new Date(s.created_at).toLocaleDateString("ja-JP")}
+                            </td>
+                            <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.name}</td>
+                            <td style={{ padding: "10px 12px", color: "#374151" }}>{prjName}</td>
+                            <td style={{ padding: "10px 12px" }}>{s.tier_name}</td>
+                            <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>
+                              ¥{(s.amount || 0).toLocaleString()}
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <span style={{
+                                padding: "3px 10px",
+                                borderRadius: 12,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#fff",
+                                background: statusColor(s.status),
+                              }}>
+                                {statusLabel(s.status)}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12 }}>
+                              {s.transfer_code ?? "-"}
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                {!isApproved(s.status) && (
+                                  <button onClick={() => updateStatus(s.id, "approved")}
+                                    style={{ padding: "4px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                    承認
+                                  </button>
+                                )}
+                                {!isRejected(s.status) && (
+                                  <button onClick={() => updateStatus(s.id, "rejected")}
+                                    style={{ padding: "4px 10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                    却下
+                                  </button>
+                                )}
+                                {!isCancelled(s.status) && (
+                                  <button onClick={() => { if (confirm("取り消しますか？")) updateStatus(s.id, "cancelled"); }}
+                                    style={{ padding: "4px 10px", background: "#6b7280", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                    取消
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{
-                  width: '100%', borderCollapse: 'collapse',
-                  background: '#fff', borderRadius: 10,
-                  overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                }}>
-                  <thead>
-                    <tr style={{ background: '#1a3a5c', color: '#fff' }}>
-                      {['日時','プロジェクト','支援者','ティア','金額','振込コード','ステータス','操作'].map(h => (
-                        <th key={h} style={{
-                          padding: '0.85rem 1rem',
-                          textAlign: 'left', whiteSpace: 'nowrap',
+            )}
+
+            {/* ===== プロジェクトタブ ===== */}
+            {tab === "projects" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+                  <button onClick={() => router.push("/admin/project-edit")}
+                    style={{
+                      padding: "10px 24px",
+                      background: "linear-gradient(135deg, #1e3a5f, #2d6a4f)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      fontWeight: 700,
+                      fontSize: 14,
+                    }}>
+                    ＋ 新規プロジェクト
+                  </button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+                  {projects.map(p => (
+                    <div key={p.id} style={{
+                      background: "#fff",
+                      borderRadius: 12,
+                      padding: 20,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e3a5f" }}>{p.title}</h3>
+                        <span style={{
+                          padding: "3px 10px",
+                          borderRadius: 12,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#fff",
+                          background: p.status === "募集中" ? "#2d6a4f" : "#6b7280",
                         }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((s, i) => {
-                      const proj = projects.find(p => p.id === s.project_id);
-                      return (
-                        <tr key={s.id} style={{
-                          background: i % 2 === 0 ? '#f8fafc' : '#fff',
-                          borderBottom: '1px solid #eee',
+                          {p.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+                        目標: ¥{(p.goal_amount || 0).toLocaleString()}
+                      </div>
+                      <button onClick={() => router.push(`/admin/project-edit?id=${p.id}`)}
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          background: "#f1f5f9",
+                          border: "1px solid #d1d5db",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontSize: 13,
+                          fontWeight: 600,
                         }}>
-                          {/* 日時 */}
-                          <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
-                            {new Date(s.created_at).toLocaleDateString('ja-JP')}
-                          </td>
-                          {/* プロジェクト */}
-                          <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>
-                            <div>{proj?.school ?? `ID:${s.project_id}`}</div>
-                            <div style={{ color: '#888', fontSize: '0.78rem' }}>{proj?.club}</div>
-                          </td>
-                          {/* 支援者 */}
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            <div style={{ fontWeight: 'bold' }}>{s.name}</div>
-                            <div style={{ fontSize: '0.78rem', color: '#888' }}>{s.email}</div>
-                          </td>
-                          {/* ティア */}
-                          <td style={{ padding: '0.75rem 1rem' }}>{s.tier}</td>
-                          {/* 金額 */}
-                          <td style={{
-                            padding: '0.75rem 1rem',
-                            textAlign: 'right', fontWeight: 'bold', whiteSpace: 'nowrap',
-                          }}>
-                            ¥{s.total_amount?.toLocaleString()}
-                          </td>
-                          {/* 振込コード */}
-                          <td style={{
-                            padding: '0.75rem 1rem',
-                            fontFamily: 'monospace', fontWeight: 'bold', color: '#e55',
-                          }}>
-                            {s.transfer_code}
-                          </td>
-                          {/* ステータス */}
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            <span style={{
-                              padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.82rem',
-                              background: isApproved(s)  ? '#d4edda'
-                                        : isRejected(s)  ? '#f8d7da'
-                                        : isCancelled(s) ? '#e0e0e0'
-                                        : '#fff3cd',
-                              color: isApproved(s)  ? '#155724'
-                                   : isRejected(s)  ? '#721c24'
-                                   : isCancelled(s) ? '#666'
-                                   : '#856404',
-                            }}>
-                              {isApproved(s)  ? '✅ 承認済'
-                               : isRejected(s)  ? '❌ 却下'
-                               : isCancelled(s) ? '取消'
-                               : '⏳ 未承認'}
-                            </span>
-                          </td>
-                          {/* 操作 */}
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              {isPending(s) && (
-                                <>
-                                  <button
-                                    onClick={() => updateStatus(s.id, 'approved')}
-                                    style={{
-                                      padding: '0.35rem 0.7rem', background: '#28a745',
-                                      color: '#fff', border: 'none', borderRadius: 4,
-                                      cursor: 'pointer', fontSize: '0.82rem',
-                                    }}
-                                  >
-                                    ✅ 承認
-                                  </button>
-                                  <button
-                                    onClick={() => updateStatus(s.id, 'rejected')}
-                                    style={{
-                                      padding: '0.35rem 0.7rem', background: '#dc3545',
-                                      color: '#fff', border: 'none', borderRadius: 4,
-                                      cursor: 'pointer', fontSize: '0.82rem',
-                                    }}
-                                  >
-                                    ❌ 却下
-                                  </button>
-                                </>
-                              )}
-                              {isApproved(s) && (
-                                <button
-                                  onClick={() => cancelSupporter(s.id)}
-                                  style={{
-                                    padding: '0.35rem 0.7rem', background: '#888',
-                                    color: '#fff', border: 'none', borderRadius: 4,
-                                    cursor: 'pointer', fontSize: '0.82rem',
-                                  }}
-                                >
-                                  取消
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        ✏️ 編集
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </>
         )}
-
-        {/* ══════════════════════════════════
-            プロジェクト管理タブ
-        ══════════════════════════════════ */}
-        {activeTab === 'projects' && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))',
-            gap: '1rem',
-          }}>
-            {projects.map(p => {
-              const sups  = supporters.filter(s => s.project_id === p.id && isApproved(s));
-              const total = sups.reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
-              const thumb = Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null;
-              return (
-                <div key={p.id} style={{
-                  background: '#fff', borderRadius: 10,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden',
-                }}>
-                  {thumb && (
-                    <img src={thumb} alt={p.title}
-                      style={{ width: '100%', height: 160, objectFit: 'cover' }} />
-                  )}
-                  <div style={{ padding: '1.25rem' }}>
-                    <div style={{ fontWeight: 'bold', color: '#1a3a5c' }}>{p.school}</div>
-                    <div style={{ color: '#555', marginBottom: '0.5rem' }}>{p.club}</div>
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between',
-                      fontSize: '0.85rem', color: '#888', marginBottom: '1rem',
-                    }}>
-                      <span>{sups.length}名</span>
-                      <span>¥{total.toLocaleString()}</span>
-                      <span style={{ color: p.status === '募集中' ? '#28a745' : '#888' }}>
-                        {p.status}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <Link href={`/projects/${p.id}`} style={{
-                        flex: 1, padding: '0.5rem', textAlign: 'center',
-                        background: '#f0f4f8', color: '#1a3a5c',
-                        borderRadius: 6, textDecoration: 'none', fontSize: '0.85rem',
-                      }}>
-                        公開ページ
-                      </Link>
-                      <Link href={`/admin/project-edit?id=${p.id}`} style={{
-                        flex: 1, padding: '0.5rem', textAlign: 'center',
-                        background: '#1a3a5c', color: '#fff',
-                        borderRadius: 6, textDecoration: 'none', fontSize: '0.85rem',
-                      }}>
-                        ✏️ 編集
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
       </div>
     </div>
   );
