@@ -36,21 +36,26 @@ export async function POST(req: NextRequest) {
     // ── Supabaseへ保存 ──
     const { error: insertError } = await supabase.from('supporters').insert({
       project_id:    1,
-      project_title: projectTitle || '',          // ← 修正②：project_title を追加
+      project_title: projectTitle || '',
       name:          supporterName,
       email:         supporterEmail,
       tier:          tier,
       units:         Number(units),
-      total_amount:  Number(totalAmount),          // ← 修正③：amount → total_amount
+      amount:        Number(totalAmount),   // ← 修正：total_amount → amount（実際のカラム名）
       transfer_code: code,
       status:        'pending',
       message:       message || '',
     });
+
+    // ── DB保存失敗時は即リターン（メール送信しない）──
     if (insertError) {
       console.error('Supabase保存エラー:', insertError.message);
-    } else {
-      console.log('Supabase保存成功 コード:', code);
+      return NextResponse.json(
+        { success: false, error: 'データベース保存エラー', detail: insertError.message },
+        { status: 500 }
+      );
     }
+    console.log('Supabase保存成功 コード:', code);
 
     const dl = new Date();
     dl.setDate(dl.getDate() + 14);
@@ -63,8 +68,6 @@ export async function POST(req: NextRequest) {
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
-
-    // ── 修正④：transporter.verify() 削除（本番では不要・エラー原因になりうる）──
 
     const sHtml = `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;">
 <div style="background:linear-gradient(135deg,#0a1628,#1a3a5c);padding:28px;text-align:center;">
