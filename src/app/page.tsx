@@ -15,19 +15,20 @@ const FEATURED_PROJECT = {
   status: "募集中",
 };
 
+// ★ 金額・説明文・amountVal を正しい値に修正
 const TIERS = [
-  { name: "ブロンズ", amount: "¥3,000〜", color: "#cd7f32", icon: "🥉", desc: "お礼メール＋活動報告" },
-  { name: "シルバー", amount: "¥10,000〜", color: "#aaa", icon: "🥈", desc: "＋オリジナルステッカー" },
-  { name: "ゴールド", amount: "¥30,000〜", color: "#d4af37", icon: "🥇", desc: "＋直筆サイン色紙" },
-  { name: "プラチナ", amount: "¥100,000〜", color: "#5be", icon: "💎", desc: "＋練習見学招待" },
-  { name: "レジェンド", amount: "¥300,000〜", color: "#e55", icon: "👑", desc: "＋ユニフォームに名前掲載" },
+  { name: "ブロンズ",   amount: "¥1,000〜",   amountVal: 1000,   color: "#cd7f32", icon: "🥉", desc: "お礼メール＋活動報告レポート送付" },
+  { name: "シルバー",   amount: "¥3,000〜",   amountVal: 3000,   color: "#aaa",    icon: "🥈", desc: "上記＋クラブオリジナルステッカー" },
+  { name: "ゴールド",   amount: "¥10,000〜",  amountVal: 10000,  color: "#d4af37", icon: "🥇", desc: "上記＋選手からの直筆サイン色紙" },
+  { name: "プラチナ",   amount: "¥30,000〜",  amountVal: 30000,  color: "#5be",    icon: "💎", desc: "上記＋練習見学招待＋記念写真撮影" },
+  { name: "レジェンド", amount: "¥100,000〜", amountVal: 100000, color: "#e55",    icon: "👑", desc: "上記＋スポンサー名をユニフォームに掲載" },
 ];
 
 const STEPS = [
-  { step: "01", title: "プロジェクトを選ぶ", desc: "応援したいチームを選択してください" },
-  { step: "02", title: "支援ティアを決める", desc: "¥3,000〜の5段階から選べます" },
+  { step: "01", title: "プロジェクトを選ぶ",   desc: "応援したいチームを選択してください" },
+  { step: "02", title: "支援ティアを決める",   desc: "¥1,000〜の5段階から選べます" }, // ★ 修正
   { step: "03", title: "申し込みフォーム入力", desc: "お名前・メールアドレスを入力" },
-  { step: "04", title: "銀行振込で支援完了", desc: "振込確認後に特典をお届けします" },
+  { step: "04", title: "銀行振込で支援完了",   desc: "振込確認後に特典をお届けします" },
 ];
 
 export default function TopPage() {
@@ -299,7 +300,6 @@ export default function TopPage() {
           <h2 className="section-title">🏸 注目プロジェクト</h2>
           <p className="section-sub">現在募集中のクラウドファンディング</p>
           <div className="project-card">
-            {/* Card Header */}
             <div style={{ background: "linear-gradient(135deg,#0a1628,#1a3060)", padding: "20px 28px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
               <div style={{ background: "#d4af37", color: "#0a1628", borderRadius: 20, padding: "3px 14px", fontSize: 12, fontWeight: "bold", whiteSpace: "nowrap" }}>
                 {FEATURED_PROJECT.status}
@@ -308,7 +308,6 @@ export default function TopPage() {
                 <div style={{ color: "#aac", fontSize: 12 }}>{FEATURED_PROJECT.school}　{FEATURED_PROJECT.club}</div>
               </div>
             </div>
-            {/* Card Body */}
             <div className="project-card-body">
               <h3 style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: "bold", color: "#0a1628", marginBottom: 8, lineHeight: 1.4 }}>
                 {FEATURED_PROJECT.title}
@@ -316,7 +315,6 @@ export default function TopPage() {
               <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>
                 {FEATURED_PROJECT.description}
               </p>
-              {/* Progress */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#888", marginBottom: 4 }}>
                   <span>達成率</span>
@@ -326,7 +324,6 @@ export default function TopPage() {
                   <div className="progress-fill" style={{ width: `${pct}%` }} />
                 </div>
               </div>
-              {/* Stats */}
               <div className="project-stats">
                 <div className="project-stat">
                   <div className="project-stat-value">¥{currentAmount.toLocaleString()}</div>
@@ -341,7 +338,6 @@ export default function TopPage() {
                   <div className="project-stat-label">残り日数</div>
                 </div>
               </div>
-              {/* Buttons */}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <Link href="/support?project=1" style={{ flex: 1, minWidth: 140, background: "linear-gradient(135deg,#d4af37,#f0c040)", color: "#0a1628", textAlign: "center", borderRadius: 10, padding: "13px", fontWeight: "bold", fontSize: 15, textDecoration: "none", display: "block" }}>
                   🏸 支援する
@@ -382,8 +378,9 @@ export default function TopPage() {
                 <div style={{ fontWeight: "bold", color: t.color, fontSize: 16, marginBottom: 4 }}>{t.name}</div>
                 <div style={{ fontWeight: "bold", color: "#0a1628", marginBottom: 8 }}>{t.amount}</div>
                 <div style={{ fontSize: 12, color: "#666", lineHeight: 1.6 }}>{t.desc}</div>
+                {/* ★ amountVal を追加して支援フォームで金額が自動入力されるように */}
                 <Link
-                  href={`/support?project=1&tier=${encodeURIComponent(t.name)}`}
+                  href={`/support?project=1&tier=${encodeURIComponent(t.name)}&amount=${t.amountVal}`}
                   style={{ display: "block", marginTop: 12, background: t.color, color: "#fff", borderRadius: 6, padding: "8px", fontSize: 13, fontWeight: "bold", textDecoration: "none" }}
                 >
                   このティアで支援
