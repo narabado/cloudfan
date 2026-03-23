@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
 
     // ── Supabaseへ保存 ──
     const { error: insertError } = await supabase.from('supporters').insert({
-      project_id:    1,
       project_title: projectTitle || '',
       name:          supporterName,
       email:         supporterEmail,
