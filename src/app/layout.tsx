@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
-import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BADMINTON SUPPORT HOKKAIDO",
-  description: "北海道の部活を応援するクラウドファンディング",
-};
-
-export const viewport = {
-  width: "device-width",
-  initialScale: 1,
+  title: "CloudFan - 部活クラウドファンディング",
+  description: "北海道の部活動を応援するクラウドファンディングサービス",
 };
 
 export default function RootLayout({
@@ -18,7 +12,31 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body style={{ margin: 0, padding: 0, fontFamily: "sans-serif", overflowX: "hidden" }}>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link
+          rel="preconnect"
+          href="https://fonts.googleapis.com"
+        />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body
+        style={{
+          margin: 0,
+          padding: 0,
+          fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif",
+          WebkitFontSmoothing: "antialiased",
+        }}
+      >
         {children}
       </body>
     </html>
