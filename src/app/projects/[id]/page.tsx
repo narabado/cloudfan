@@ -22,8 +22,9 @@ interface Project {
   story: string;
   school: string;
   club: string;
-  goal_amount: number;
-  current_amount: number;
+  goal_amount: number | null;
+  goal: number | null;
+  current_amount: number | null;
   deadline: string;
   status: string;
   youtube_url: string | null;
@@ -31,11 +32,16 @@ interface Project {
   region: string;
 }
 
+interface Supporter {
+  total_amount: number;
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [tiers, setTiers] = useState<Tier[]>([]);
+  const [totalRaised, setTotalRaised] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<number>(0);
@@ -44,6 +50,7 @@ export default function ProjectPage() {
     const projectId = params.id as string;
     fetchProject(projectId);
     fetchTiers(projectId);
+    fetchSupporters(projectId);
   }, [params.id]);
 
   async function fetchProject(id: string) {
@@ -61,12 +68,32 @@ export default function ProjectPage() {
   }
 
   async function fetchTiers(id: string) {
-    const { data } = await supabase
-      .from('project_tiers')
-      .select('*')
-      .eq('project_id', id)
-      .order('amount', { ascending: true });
-    if (data) setTiers(data);
+    try {
+      const { data } = await supabase
+        .from('project_tiers')
+        .select('*')
+        .eq('project_id', id)
+        .order('amount', { ascending: true });
+      if (data) setTiers(data);
+    } catch {
+      // project_tiers テーブルが存在しない場合は無視
+    }
+  }
+
+  async function fetchSupporters(id: string) {
+    try {
+      const { data } = await supabase
+        .from('supporters')
+        .select('total_amount')
+        .eq('project_id', id)
+        .in('status', ['approved', '承認', '承認済']);
+      if (data) {
+        const total = (data as Supporter[]).reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
+        setTotalRaised(total);
+      }
+    } catch {
+      // 無視
+    }
   }
 
   if (loading) return (
@@ -84,8 +111,13 @@ export default function ProjectPage() {
     </div>
   );
 
-  const progress = Math.min(100, Math.round((project.current_amount / project.goal_amount) * 100));
-  const daysLeft = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000));
+  // goal_amount / goal どちらのカラム名にも対応
+  const goalAmt = project.goal_amount ?? project.goal ?? 1;
+  const currentAmt = project.current_amount ?? totalRaised ?? 0;
+  const progress = goalAmt > 0 ? Math.min(100, Math.round((currentAmt / goalAmt) * 100)) : 0;
+  const daysLeft = project.deadline
+    ? Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000))
+    : 0;
   const validImages = (project.images ?? []).filter(url => url && url.trim() !== '');
 
   return (
@@ -107,18 +139,17 @@ export default function ProjectPage() {
         {/* タイトル */}
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
-            <span style={{ background: '#e8f0fe', color: '#1a3a5c', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>{project.school}</span>
-            <span style={{ background: '#e8f0fe', color: '#1a3a5c', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>{project.club}</span>
-            <span style={{ background: '#fff3cd', color: '#856404', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>📍 {project.region}</span>
+            {project.school && <span style={{ background: '#e8f0fe', color: '#1a3a5c', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>{project.school}</span>}
+            {project.club && <span style={{ background: '#e8f0fe', color: '#1a3a5c', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>{project.club}</span>}
+            {project.region && <span style={{ background: '#fff3cd', color: '#856404', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>📍 {project.region}</span>}
           </div>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1a3a5c', marginBottom: '0.5rem' }}>{project.title}</h1>
-          <p style={{ color: '#4a6080', fontSize: '1rem', lineHeight: 1.6 }}>{project.description}</p>
+          {project.description && <p style={{ color: '#4a6080', fontSize: '1rem', lineHeight: 1.6 }}>{project.description}</p>}
         </div>
 
         {/* ── 画像ギャラリー ── */}
         {validImages.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
-            {/* メイン画像 */}
             <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '0.75rem', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
               <img
                 src={validImages[selectedImage]}
@@ -126,7 +157,6 @@ export default function ProjectPage() {
                 style={{ width: '100%', height: '420px', objectFit: 'cover', display: 'block' }}
               />
             </div>
-            {/* サムネイル（複数枚のときのみ表示） */}
             {validImages.length > 1 && (
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                 {validImages.map((url, i) => (
@@ -141,11 +171,7 @@ export default function ProjectPage() {
                       transition: 'all 0.2s',
                     }}
                   >
-                    <img
-                      src={url}
-                      alt={`サムネイル${i + 1}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
+                    <img src={url} alt={`サムネイル${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   </div>
                 ))}
               </div>
@@ -156,8 +182,8 @@ export default function ProjectPage() {
         {/* 進捗 */}
         <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a6fc4' }}>¥{project.current_amount.toLocaleString()}</span>
-            <span style={{ color: '#888', fontSize: '0.9rem' }}>目標 ¥{project.goal_amount.toLocaleString()}</span>
+            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a6fc4' }}>¥{currentAmt.toLocaleString()}</span>
+            <span style={{ color: '#888', fontSize: '0.9rem' }}>目標 ¥{goalAmt.toLocaleString()}</span>
           </div>
           <div style={{ background: '#e8f0fe', borderRadius: '8px', height: '12px', marginBottom: '0.8rem' }}>
             <div style={{ background: 'linear-gradient(90deg, #1a6fc4, #2a9fd6)', width: `${progress}%`, height: '100%', borderRadius: '8px', transition: 'width 0.5s' }} />
