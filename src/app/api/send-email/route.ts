@@ -1,4 +1,4 @@
-undefinedimport { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
@@ -36,11 +36,12 @@ export async function POST(req: NextRequest) {
     // ── Supabaseへ保存 ──
     const { error: insertError } = await supabase.from('supporters').insert({
       project_id:    1,
+      project_title: projectTitle || '',          // ← 修正②：project_title を追加
       name:          supporterName,
       email:         supporterEmail,
       tier:          tier,
       units:         Number(units),
-      amount:        Number(totalAmount),
+      total_amount:  Number(totalAmount),          // ← 修正③：amount → total_amount
       transfer_code: code,
       status:        'pending',
       message:       message || '',
@@ -63,9 +64,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ── 接続テスト（デバッグ用） ──
-    await transporter.verify();
-    console.log('Gmail接続OK');
+    // ── 修正④：transporter.verify() 削除（本番では不要・エラー原因になりうる）──
 
     const sHtml = `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;">
 <div style="background:linear-gradient(135deg,#0a1628,#1a3a5c);padding:28px;text-align:center;">
@@ -86,6 +85,12 @@ export async function POST(req: NextRequest) {
     </table>
   </div>
 
+  <div style="background:linear-gradient(135deg,#0a1628,#1a3060);border-radius:10px;padding:20px;margin:20px 0;text-align:center;">
+    <div style="color:#aac;font-size:12px;margin-bottom:6px;">お振込管理番号</div>
+    <div style="color:#d4af37;font-family:monospace;font-size:48px;font-weight:bold;letter-spacing:8px;">${code}</div>
+    <div style="color:#aac;font-size:12px;margin-top:6px;">振込名義人名の前に必ずご記載ください</div>
+  </div>
+
   <div style="background:#fffbf0;border:2px solid #d4af37;border-radius:8px;padding:20px;margin-bottom:20px;">
     <h3 style="margin:0 0 12px;font-size:14px;color:#1a1a2e;">🏦 振込先情報</h3>
     <table style="width:100%;border-collapse:collapse;">
@@ -94,8 +99,14 @@ export async function POST(req: NextRequest) {
       <tr><td style="padding:5px 0;color:#888;font-size:13px;">口座種別</td><td style="padding:5px 0;font-size:13px;">普通</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px;">口座番号</td><td style="padding:5px 0;font-size:14px;font-weight:700;">2787470</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px;">口座名義</td><td style="padding:5px 0;font-size:13px;font-weight:700;">一般社団法人 Plus Mind</td></tr>
-      <tr><td style="padding:5px 0;color:#888;font-size:13px;">振込金額</td><td style="padding:5px 0;font-size:15px;font-weight:900;color:#d4af37;">¥${Number(totalAmount).toLocaleString()}</td></tr>
-      <tr><td style="padding:5px 0;color:#888;font-size:13px;">振込期限</td><td style="padding:5px 0;font-size:13px;color:#e74c3c;font-weight:700;">${dlStr}</td></tr>
+      <tr style="border-top:2px solid #d4af37;">
+        <td style="padding:10px 0 5px;color:#888;font-size:13px;">振込金額</td>
+        <td style="padding:10px 0 5px;font-size:15px;font-weight:900;color:#d4af37;">¥${Number(totalAmount).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td style="padding:5px 0;color:#888;font-size:13px;">振込期限</td>
+        <td style="padding:5px 0;font-size:13px;color:#e74c3c;font-weight:700;">${dlStr}</td>
+      </tr>
     </table>
     <div style="background:#fff8e1;border-radius:6px;padding:14px;margin-top:14px;text-align:center;">
       <p style="margin:0;font-size:12px;color:#888;">振込名義人名の前に必ずこの番号を入力してください</p>
@@ -132,16 +143,10 @@ export async function POST(req: NextRequest) {
     </table>
   </div>
 
-  <div style="background:#e8f5e9;border-radius:8px;padding:20px;margin-bottom:20px;">
-    <h3 style="margin:0 0 10px;font-size:14px;color:#27ae60;">🎁 返礼品</h3>
-    <p style="margin:0;font-size:14px;color:#555;">各ランクに応じて返礼品をお送りさせていただきます</p>
-    <p style="margin:6px 0 0;font-size:12px;color:#888;">※ 入金確認後、順次発送いたします</p>
-  </div>
-
   <p style="font-size:13px;color:#888;">ご不明な点は <a href="mailto:${ADMIN_EMAIL}" style="color:#d4af37;">${ADMIN_EMAIL}</a> までご連絡ください。</p>
 </div>
 <div style="background:#0a1628;padding:16px;text-align:center;">
-  <p style="color:#888;font-size:11px;margin:0;">© 2025 BADMINTON SUPPORT HOKKAIDO / 一般社団法人 Plus Mind</p>
+  <p style="color:#888;font-size:11px;margin:0;">© 2026 BADMINTON SUPPORT HOKKAIDO / 一般社団法人 Plus Mind</p>
 </div>
 </div>`;
 
@@ -166,7 +171,6 @@ export async function POST(req: NextRequest) {
       subject: `【支援受付】管理番号 ${code} - ご支援ありがとうございます`,
       html: sHtml,
     });
-    console.log('支援者メール送信成功:', supporterEmail);
 
     await transporter.sendMail({
       from: `"BADMINTON SUPPORT HOKKAIDO" <${ADMIN_EMAIL}>`,
@@ -174,7 +178,6 @@ export async function POST(req: NextRequest) {
       subject: `【新規支援】${supporterName}様 ¥${Number(totalAmount).toLocaleString()} 番号:${code}`,
       html: aHtml,
     });
-    console.log('管理者メール送信成功:', ADMIN_EMAIL);
 
     return NextResponse.json({ success: true, transferCode: code });
 
