@@ -29,7 +29,7 @@ export default function ProjectEditForm() {
     if (!isEdit || !idParam) return;
     (async () => {
       const { data, error } = await supabase
-        .from("projects")
+        .from("プロジェクト")
         .select("*")
         .eq("id", Number(idParam))
         .single();
@@ -73,13 +73,13 @@ export default function ProjectEditForm() {
       let dbError;
       if (isEdit && idParam) {
         const { error } = await supabase
-          .from("projects")
+          .from("プロジェクト")
           .update(payload)
           .eq("id", Number(idParam));
         dbError = error;
       } else {
         const { error } = await supabase
-          .from("projects")
+          .from("プロジェクト")
           .insert(payload);
         dbError = error;
       }
