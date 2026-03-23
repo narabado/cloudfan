@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase"; // ← 既存クライアント使用（問題2修正）
+import { supabase } from "@/lib/supabase";
 
 const DEFAULT_TIERS = [
   { name: "ブロンズ",   amount: 1000,   description: "お礼メール＋活動報告レポート送付" },
@@ -21,7 +22,6 @@ const tierIcon: Record<string, string> = {
 type Tier = { name: string; amount: number; description: string };
 type Supporter = { name: string; tier: string; total_amount: number; message: string; created_at: string };
 
-// ★ 問題1修正：「2026年5月7日」→「2026-05-07」に正しく変換
 function toISODate(jpDate: string): string {
   const m = jpDate.match(/(\d+)年(\d+)月(\d+)日/);
   if (!m) return jpDate;
@@ -29,19 +29,21 @@ function toISODate(jpDate: string): string {
 }
 
 export default function ProjectDetail() {
-  const [project, setProject]     = useState<any>(null);
-  const [tiers, setTiers]         = useState<Tier[]>(DEFAULT_TIERS);
+  const params    = useParams();
+  const projectId = Number(params.id ?? 1);   // ← URLの[id]を使用
+
+  const [project,    setProject]    = useState<any>(null);
+  const [tiers,      setTiers]      = useState<Tier[]>(DEFAULT_TIERS);
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [projLoading, setProjLoading] = useState(true);
-  const [supLoading, setSupLoading]   = useState(true);
+  const [supLoading,  setSupLoading]  = useState(true);
 
   useEffect(() => {
-    // プロジェクトデータ読み込み
     (async () => {
       const { data } = await supabase
         .from("crowdfunding_projects")
         .select("*")
-        .eq("id", 1)
+        .eq("id", projectId)   // ← 動的
         .single();
       if (data) {
         setProject(data);
@@ -50,33 +52,32 @@ export default function ProjectDetail() {
       setProjLoading(false);
     })();
 
-    // 支援者データ読み込み（独立して並行実行）
     (async () => {
       const { data } = await supabase
         .from("supporters")
         .select("name, tier, total_amount, message, created_at")
         .eq("status", "approved")
-        .eq("project_id", 1)
+        .eq("project_id", projectId)   // ← 動的
         .order("total_amount", { ascending: false });
       setSupporters((data as Supporter[]) ?? []);
       setSupLoading(false);
     })();
-  }, []);
+  }, [projectId]);
 
-  const goal      = project?.goal     ?? 500000;
-  const title     = project?.title    ?? "北星学園女子バドミントン部を応援しよう";
-  const school    = project?.school   ?? "北星学園女子中学高等学校";
-  const club      = project?.club     ?? "バドミントン部";
-  const story     = project?.story    ?? "";
-  const deadline  = project?.deadline ?? "2026年5月7日";
+  const goal       = project?.goal     ?? 500000;
+  const title      = project?.title    ?? "";
+  const school     = project?.school   ?? "";
+  const club       = project?.club     ?? "";
+  const story      = project?.story    ?? "";
+  const deadline   = project?.deadline ?? "";
   const youtubeUrl = project?.youtube_url ?? "";
 
-  const deadlineISO  = toISODate(deadline); // ← 問題1修正
-  const totalAmount  = supporters.reduce((s, r) => s + (r.total_amount || 0), 0);
-  const pct          = goal ? Math.min(Math.round((totalAmount / goal) * 100), 100) : 0;
-  const daysLeft     = Math.max(0, Math.ceil((new Date(deadlineISO).getTime() - Date.now()) / 86400000));
+  const deadlineISO = toISODate(deadline);
+  const totalAmount = supporters.reduce((s, r) => s + (r.total_amount || 0), 0);
+  const pct         = goal ? Math.min(Math.round((totalAmount / goal) * 100), 100) : 0;
+  const daysLeft    = Math.max(0, Math.ceil((new Date(deadlineISO).getTime() - Date.now()) / 86400000));
 
-  const siteUrl   = "https://cloudfan.vercel.app/projects/1";
+  const siteUrl   = `https://cloudfan.vercel.app/projects/${projectId}`;
   const shareText = encodeURIComponent(`${title} を応援しています！ #バドミントン #北海道`);
   const fbUrl     = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}`;
   const twUrl     = `https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(siteUrl)}`;
@@ -123,16 +124,14 @@ export default function ProjectDetail() {
       `}</style>
 
       <div style={{ fontFamily:"sans-serif", minHeight:"100vh", background:"#f5f7fa" }}>
-        {/* ★ 問題3修正：Navは常に表示 */}
         <nav className="project-nav">
           <Link href="/" className="nav-title">🏸 BADMINTON SUPPORT HOKKAIDO</Link>
           <div className="nav-links">
             <Link href="/" className="nav-link">← トップ</Link>
-            <Link href="/admin/project-edit?id=1" className="nav-link">✏️ 編集</Link>
+            <Link href={`/admin/project-edit?id=${projectId}`} className="nav-link">✏️ 編集</Link>
           </div>
         </nav>
 
-        {/* Hero（プロジェクト読み込み中はスケルトン表示） */}
         <div style={{ background:"linear-gradient(135deg,#0a1628 0%,#1a3060 100%)",padding:"40px 20px",textAlign:"center" }}>
           {projLoading ? (
             <div style={{ color:"#aac", fontSize:14 }}>読み込み中...</div>
@@ -148,7 +147,7 @@ export default function ProjectDetail() {
         </div>
 
         <div className="sidebar-mobile">
-          <SidebarCard totalAmount={totalAmount} pct={pct} goal={goal} supporters={supporters} daysLeft={daysLeft} deadline={deadline} twUrl={twUrl} lineUrl={lineUrl} fbUrl={fbUrl} />
+          <SidebarCard totalAmount={totalAmount} pct={pct} goal={goal} supporters={supporters} daysLeft={daysLeft} deadline={deadline} twUrl={twUrl} lineUrl={lineUrl} fbUrl={fbUrl} projectId={projectId} />
         </div>
 
         <div className="project-layout">
@@ -181,7 +180,7 @@ export default function ProjectDetail() {
                       <span style={{ fontWeight:"bold",color:"#0a1628" }}>¥{t.amount.toLocaleString()}〜</span>
                     </div>
                     <p style={{ fontSize:13,color:"#555",margin:0,lineHeight:1.6 }}>{t.description}</p>
-                    <Link href={`/support?project=1&tier=${encodeURIComponent(t.name)}&amount=${t.amount}`}
+                    <Link href={`/support?project=${projectId}&tier=${encodeURIComponent(t.name)}&amount=${t.amount}`}
                       style={{ display:"block",marginTop:12,background:tierColor[t.name]??"#d4af37",color:"#fff",textAlign:"center",borderRadius:6,padding:"8px",fontSize:13,fontWeight:"bold",textDecoration:"none" }}>
                       このティアで支援
                     </Link>
@@ -191,9 +190,7 @@ export default function ProjectDetail() {
             </section>
 
             <section style={{ background:"#fff",borderRadius:12,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-              <h2 style={{ color:"#0a1628",fontSize:18,borderBottom:"2px solid #d4af37",paddingBottom:8,marginBottom:16 }}>
-                👥 支援者一覧（{supporters.length}名）
-              </h2>
+              <h2 style={{ color:"#0a1628",fontSize:18,borderBottom:"2px solid #d4af37",paddingBottom:8,marginBottom:16 }}>👥 支援者一覧（{supporters.length}名）</h2>
               {supLoading ? (
                 <p style={{ color:"#888",textAlign:"center",padding:32 }}>読み込み中...</p>
               ) : supporters.length === 0 ? (
@@ -219,7 +216,7 @@ export default function ProjectDetail() {
           </div>
 
           <aside className="project-sidebar sidebar-desktop">
-            <SidebarCard totalAmount={totalAmount} pct={pct} goal={goal} supporters={supporters} daysLeft={daysLeft} deadline={deadline} twUrl={twUrl} lineUrl={lineUrl} fbUrl={fbUrl} />
+            <SidebarCard totalAmount={totalAmount} pct={pct} goal={goal} supporters={supporters} daysLeft={daysLeft} deadline={deadline} twUrl={twUrl} lineUrl={lineUrl} fbUrl={fbUrl} projectId={projectId} />
           </aside>
         </div>
       </div>
@@ -227,8 +224,8 @@ export default function ProjectDetail() {
   );
 }
 
-function SidebarCard({ totalAmount, pct, goal, supporters, daysLeft, deadline, twUrl, lineUrl, fbUrl }:
-  { totalAmount:number; pct:number; goal:number; supporters:Supporter[]; daysLeft:number; deadline:string; twUrl:string; lineUrl:string; fbUrl:string }) {
+function SidebarCard({ totalAmount, pct, goal, supporters, daysLeft, deadline, twUrl, lineUrl, fbUrl, projectId }:
+  { totalAmount:number; pct:number; goal:number; supporters:Supporter[]; daysLeft:number; deadline:string; twUrl:string; lineUrl:string; fbUrl:string; projectId:number }) {
   return (
     <div style={{ background:"#fff",borderRadius:12,padding:24,boxShadow:"0 4px 16px rgba(0,0,0,.10)",border:"2px solid #d4af37" }}>
       <div style={{ marginBottom:16 }}>
@@ -252,7 +249,7 @@ function SidebarCard({ totalAmount, pct, goal, supporters, daysLeft, deadline, t
           </div>
         ))}
       </div>
-      <Link href="/support?project=1" style={{ display:"block",background:"linear-gradient(135deg,#d4af37,#f0c040)",color:"#0a1628",textAlign:"center",borderRadius:10,padding:"14px",fontSize:16,fontWeight:"bold",textDecoration:"none",marginBottom:12,boxShadow:"0 4px 12px rgba(212,175,55,.4)" }}>
+      <Link href={`/support?project=${projectId}`} style={{ display:"block",background:"linear-gradient(135deg,#d4af37,#f0c040)",color:"#0a1628",textAlign:"center",borderRadius:10,padding:"14px",fontSize:16,fontWeight:"bold",textDecoration:"none",marginBottom:12,boxShadow:"0 4px 12px rgba(212,175,55,.4)" }}>
         🏸 このプロジェクトを支援する
       </Link>
       <div className="share-btns">
