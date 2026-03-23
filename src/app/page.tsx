@@ -1,353 +1,354 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
-// ────────────────────────────────────────────────
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+// =============================================
+// Supabase クライアント
+// =============================================
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// =============================================
 // 型定義
-// ────────────────────────────────────────────────
-type Project = {
+// =============================================
+interface Tier {
+  name: string;
+  amount: number;
+  description: string;
+}
+
+interface Project {
   id: number;
   school: string;
   club: string;
   title: string;
   description: string;
+  story: string;
   goal: number;
   deadline: string;
-  status: string;
   region: string;
-  tiers: { name: string; amount: number }[];
+  youtube_url: string;
   images: string[];
-};
+  tiers: Tier[];
+  status: string;
+}
 
-// ────────────────────────────────────────────────
-// 支援ステップ
-// ────────────────────────────────────────────────
-const STEPS = [
-  { icon: "🏆", title: "STEP 01", label: "チームを選ぶ", desc: "応援したい学校・部活を探す" },
-  { icon: "💰", title: "STEP 02", label: "ティアを選ぶ", desc: "¥1,000〜の5段階から選べます" },
-  { icon: "📝", title: "STEP 03", label: "申し込む", desc: "フォームに入力して送信" },
-  { icon: "🏦", title: "STEP 04", label: "振込で完了", desc: "振込コードをメールでお送りします" },
-];
+interface Supporter {
+  project_id: number;
+  total_amount: number;
+}
 
-// ────────────────────────────────────────────────
+// =============================================
 // ユーティリティ
-// ────────────────────────────────────────────────
-function toISODate(jpDate: string): string {
-  const m = jpDate?.match(/(\d+)年(\d+)月(\d+)日/);
-  return m ? `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}` : jpDate ?? "";
+// =============================================
+function toISODate(d: string): string {
+  if (!d) return "";
+  if (d.includes("T")) return d.split("T")[0];
+  const m = d.match(/(\d{4})[年\-\/](\d{1,2})[月\-\/](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+  return d;
 }
 
 function calcDaysLeft(deadline: string): number {
-  const iso = toISODate(deadline);
-  if (!iso) return 0;
-  return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000));
+  if (!deadline) return 0;
+  const end = new Date(toISODate(deadline));
+  const now = new Date();
+  end.setHours(23, 59, 59, 999);
+  return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000));
 }
 
-// ────────────────────────────────────────────────
+function fmt(n: number): string {
+  return n.toLocaleString("ja-JP");
+}
+
+// =============================================
 // メインコンポーネント
-// ────────────────────────────────────────────────
+// =============================================
 export default function TopPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [supporters, setSupporters] = useState<{ project_id: number; total_amount: number }[]>([]);
+  const [supporterMap, setSupporterMap] = useState<Record<number, { total: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      // 全プロジェクトを取得
-      const { data: projData } = await supabase
+      // プロジェクト取得
+      const { data: pData } = await supabase
         .from("crowdfunding_projects")
         .select("*")
         .eq("status", "募集中")
         .order("id", { ascending: true });
-      setProjects((projData as Project[]) ?? []);
 
-      // 承認済み支援者を全件取得
-      const { data: supData } = await supabase
+      // 支援者取得（承認済み）
+      const { data: sData } = await supabase
         .from("supporters")
         .select("project_id, total_amount")
-        .eq("status", "approved");
-      setSupporters(supData ?? []);
+        .eq("status", "承認");
 
+      const map: Record<number, { total: number; count: number }> = {};
+      (sData ?? []).forEach((s: Supporter) => {
+        const pid = s.project_id ?? 1;
+        if (!map[pid]) map[pid] = { total: 0, count: 0 };
+        map[pid].total += s.total_amount ?? 0;
+        map[pid].count += 1;
+      });
+
+      setProjects(pData ?? []);
+      setSupporterMap(map);
       setLoading(false);
     })();
   }, []);
 
-  // プロジェクト別の集計
-  const getStats = (projectId: number) => {
-    const sups = supporters.filter((s) => s.project_id === projectId);
-    const total = sups.reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
-    return { total, count: sups.length };
+  // 全体統計
+  const totalAmount = Object.values(supporterMap).reduce((s, v) => s + v.total, 0);
+  const totalSupporters = Object.values(supporterMap).reduce((s, v) => s + v.count, 0);
+  const minDays = projects.length > 0 ? Math.min(...projects.map((p) => calcDaysLeft(p.deadline))) : 0;
+
+  // =============================================
+  // ナビバー
+  // =============================================
+  const NavBar = () => (
+    <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)", borderBottom: "1px solid #e5e7eb", padding: "0 24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => router.push("/")}>
+          <div style={{ width: 36, height: 36, background: "linear-gradient(135deg,#1e3a5f,#2563eb)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}>C</span>
+          </div>
+          <span style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f" }}>CloudFan</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
+            style={{ background: "none", border: "none", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#374151", fontWeight: 500 }}
+          >
+            プロジェクト一覧
+          </button>
+          <button
+            onClick={() => document.getElementById("how-to")?.scrollIntoView({ behavior: "smooth" })}
+            style={{ background: "none", border: "none", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#374151", fontWeight: 500 }}
+          >
+            支援の流れ
+          </button>
+          <button
+            onClick={() => router.push("/admin")}
+            style={{ background: "#1e3a5f", color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}
+          >
+            管理者
+          </button>
+        </div>
+      </div>
+    </nav>
+  );
+
+  // =============================================
+  // ヒーローセクション
+  // =============================================
+  const Hero = () => (
+    <div style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#2563eb 50%,#0ea5e9 100%)", color: "#fff", padding: "80px 24px", textAlign: "center" }}>
+      <div style={{ maxWidth: 700, margin: "0 auto" }}>
+        <div style={{ display: "inline-block", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", borderRadius: 20, padding: "6px 20px", fontSize: 13, fontWeight: 600, marginBottom: 24, letterSpacing: "0.05em" }}>
+          🏆 北海道部活クラウドファンディング
+        </div>
+        <h1 style={{ fontSize: "clamp(28px,5vw,48px)", fontWeight: 800, lineHeight: 1.3, marginBottom: 20 }}>
+          北海道の部活動を<br />みんなで応援しよう
+        </h1>
+        <p style={{ fontSize: "clamp(15px,2vw,18px)", opacity: 0.9, lineHeight: 1.7, marginBottom: 36 }}>
+          夢を持つ学生アスリートたちを<br />あなたの支援で後押ししてください
+        </p>
+        <button
+          onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
+          style={{ background: "#fff", color: "#1e3a5f", border: "none", padding: "16px 40px", borderRadius: 40, fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}
+        >
+          プロジェクトを見る →
+        </button>
+      </div>
+    </div>
+  );
+
+  // =============================================
+  // 統計バー
+  // =============================================
+  const StatsBar = () => (
+    <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "20px 24px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, textAlign: "center" }}>
+        {[
+          { label: "累計支援額", value: `¥${fmt(totalAmount)}` },
+          { label: "支援者数", value: `${fmt(totalSupporters)}人` },
+          { label: "募集中プロジェクト", value: `${projects.length}件` },
+          { label: "残り日数", value: projects.length > 0 ? `${minDays}日` : "—" },
+        ].map((s) => (
+          <div key={s.label}>
+            <div style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#1e3a5f" }}>{s.value}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // =============================================
+  // プロジェクトカード
+  // =============================================
+  const ProjectCard = ({ project }: { project: Project }) => {
+    const stats = supporterMap[project.id] ?? { total: 0, count: 0 };
+    const pct = project.goal > 0 ? Math.min(100, Math.round((stats.total / project.goal) * 100)) : 0;
+    const daysLeft = calcDaysLeft(project.deadline);
+    const minTier = project.tiers?.length > 0
+      ? Math.min(...project.tiers.map((t) => t.amount))
+      : 1000;
+    const mainImage = project.images?.[0] ?? null;
+
+    return (
+      <div
+        style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(0,0,0,0.08)", transition: "transform 0.2s, box-shadow 0.2s", cursor: "pointer" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(0,0,0,0.14)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 16px rgba(0,0,0,0.08)"; }}
+      >
+        {/* カードヘッダー（画像 or グラデーション） */}
+        <div style={{ position: "relative", height: 180, overflow: "hidden" }}>
+          {mainImage ? (
+            <img src={mainImage} alt={project.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#1e3a5f,#2563eb,#0ea5e9)" }} />
+          )}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 60%)" }} />
+          <div style={{ position: "absolute", top: 12, right: 12, background: daysLeft <= 7 ? "#dc2626" : "#1e3a5f", color: "#fff", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+            残り{daysLeft}日
+          </div>
+          <div style={{ position: "absolute", bottom: 12, left: 16, right: 16 }}>
+            <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 12, margin: "0 0 2px" }}>{project.school}</p>
+            <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.3 }}>{project.title}</h3>
+          </div>
+        </div>
+
+        {/* カード本文 */}
+        <div style={{ padding: 20 }}>
+          {/* プログレスバー */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 800, color: "#1e3a5f" }}>¥{fmt(stats.total)}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: pct >= 100 ? "#059669" : "#2563eb" }}>{pct}%</span>
+            </div>
+            <div style={{ height: 8, background: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "linear-gradient(90deg,#059669,#34d399)" : "linear-gradient(90deg,#2563eb,#0ea5e9)", borderRadius: 4, transition: "width 0.8s" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>目標 ¥{fmt(project.goal)}</span>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>{fmt(stats.count)}人が支援</span>
+            </div>
+          </div>
+
+          {/* 説明文 */}
+          <p style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.6, marginBottom: 16, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {project.description}
+          </p>
+
+          {/* ボタン */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <button
+              onClick={() => router.push(`/projects/${project.id}`)}
+              style={{ padding: "11px 8px", border: "2px solid #1e3a5f", borderRadius: 10, background: "#fff", color: "#1e3a5f", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            >
+              詳細を見る
+            </button>
+            <button
+              onClick={() => router.push(`/support?project_id=${project.id}`)}
+              style={{ padding: "11px 8px", border: "none", borderRadius: 10, background: "linear-gradient(135deg,#1e3a5f,#2563eb)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            >
+              ¥{fmt(minTier)}〜 支援する
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  // 全体統計
-  const totalAmount = supporters.reduce((s, r) => s + (r.total_amount ?? 0), 0);
-  const totalSupporters = supporters.length;
-  const activeProjects = projects.length;
-  const minDaysLeft = projects.length > 0
-    ? Math.min(...projects.map((p) => calcDaysLeft(p.deadline)))
-    : 0;
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-
-      {/* ── ナビゲーション ── */}
-      <nav style={{
-        background: "linear-gradient(135deg, #1a3a5c 0%, #2d6a9f 100%)",
-        color: "#fff", padding: "1rem 2rem",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-      }}>
-        <Link href="/" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontSize: "1.5rem" }}>⛅</span>
-          <span style={{ fontWeight: "bold", fontSize: "1.2rem" }}>CloudFan</span>
-          <span style={{ fontSize: "0.8rem", opacity: 0.8, marginLeft: "0.25rem" }}>部活クラウドファンディング</span>
-        </Link>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <Link href="#projects" style={{ color: "#fff", textDecoration: "none", opacity: 0.9, fontSize: "0.9rem" }}>
-            プロジェクト一覧
-          </Link>
-          <Link href="/admin" style={{
-            color: "#fff", textDecoration: "none",
-            background: "rgba(255,255,255,0.2)", padding: "0.4rem 0.8rem",
-            borderRadius: "6px", fontSize: "0.85rem",
-          }}>
-            🛠 管理
-          </Link>
-        </div>
-      </nav>
-
-      {/* ── ヒーローセクション ── */}
-      <section style={{
-        background: "linear-gradient(135deg, #1a3a5c 0%, #2d6a9f 60%, #4a90d9 100%)",
-        color: "#fff", padding: "4rem 2rem", textAlign: "center",
-      }}>
-        <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-          <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>⛅</div>
-          <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 3rem)", fontWeight: "bold", marginBottom: "1rem", lineHeight: 1.3 }}>
-            北海道の部活動を<br />みんなで応援しよう
-          </h1>
-          <p style={{ fontSize: "1.1rem", opacity: 0.9, marginBottom: "2rem", lineHeight: 1.8 }}>
-            CloudFanは北海道の学校部活動を支援するクラウドファンディングプラットフォームです。<br />
-            あなたの応援が、選手たちの夢を実現します。
-          </p>
-          <Link href="#projects" style={{
-            display: "inline-block", padding: "1rem 2.5rem",
-            background: "#f0a500", color: "#fff",
-            borderRadius: "50px", textDecoration: "none",
-            fontWeight: "bold", fontSize: "1.1rem",
-            boxShadow: "0 4px 15px rgba(240,165,0,0.4)",
-          }}>
-            🏆 プロジェクトを見る
-          </Link>
-        </div>
-      </section>
-
-      {/* ── 全体統計バー ── */}
-      <section style={{
-        background: "#1a3a5c", color: "#fff",
-        padding: "1.5rem 2rem",
-      }}>
-        <div style={{
-          maxWidth: "900px", margin: "0 auto",
-          display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "1rem", textAlign: "center",
-        }}>
+  // =============================================
+  // 支援の流れ
+  // =============================================
+  const HowTo = () => (
+    <div id="how-to" style={{ background: "#f9fafb", padding: "64px 24px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <h2 style={{ textAlign: "center", fontSize: 26, fontWeight: 800, color: "#1e3a5f", marginBottom: 48 }}>支援の流れ</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 24 }}>
           {[
-            { value: `¥${totalAmount.toLocaleString()}`, label: "総支援金額" },
-            { value: `${totalSupporters}名`, label: "支援者数" },
-            { value: `${activeProjects}件`, label: "募集中プロジェクト" },
-            { value: `${minDaysLeft}日`, label: "最短残り日数" },
-          ].map(({ value, label }) => (
-            <div key={label}>
-              <div style={{ fontSize: "clamp(1.2rem, 2.5vw, 1.8rem)", fontWeight: "bold", color: "#f0a500" }}>
-                {loading ? "…" : value}
+            { step: "01", icon: "🔍", title: "プロジェクトを探す", desc: "応援したいチームを見つけましょう" },
+            { step: "02", icon: "💰", title: "支援コースを選ぶ", desc: "¥1,000〜好きな金額・コースを選択" },
+            { step: "03", icon: "📝", title: "フォームに入力", desc: "お名前とメールアドレスを入力" },
+            { step: "04", icon: "🏦", title: "振込で支援完了", desc: "振込コードをメールで受け取り振込" },
+          ].map((s) => (
+            <div key={s.step} style={{ background: "#fff", borderRadius: 14, padding: 24, textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+              <div style={{ width: 48, height: 48, background: "linear-gradient(135deg,#1e3a5f,#2563eb)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 11, fontWeight: 800, color: "#fff" }}>
+                {s.step}
               </div>
-              <div style={{ fontSize: "0.8rem", opacity: 0.8, marginTop: "0.25rem" }}>{label}</div>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>{s.icon}</div>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e3a5f", marginBottom: 6 }}>{s.title}</h3>
+              <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5, margin: 0 }}>{s.desc}</p>
             </div>
           ))}
         </div>
-      </section>
+      </div>
+    </div>
+  );
 
-      {/* ── プロジェクト一覧 ── */}
-      <section id="projects" style={{ padding: "3rem 2rem", maxWidth: "1200px", margin: "0 auto" }}>
-        <h2 style={{ color: "#1a3a5c", textAlign: "center", fontSize: "1.8rem", marginBottom: "0.5rem" }}>
-          🏆 募集中のプロジェクト
-        </h2>
-        <p style={{ textAlign: "center", color: "#666", marginBottom: "2.5rem" }}>
-          応援したいチームを選んで支援しましょう
-        </p>
+  // =============================================
+  // フッター
+  // =============================================
+  const Footer = () => (
+    <footer style={{ background: "#1e3a5f", color: "#fff", padding: "32px 24px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>CloudFan</div>
+          <div style={{ fontSize: 13, opacity: 0.7 }}>北海道の部活動を応援するクラウドファンディング</div>
+        </div>
+        <div style={{ display: "flex", gap: 24 }}>
+          <button onClick={() => router.push("/admin")} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: 13 }}>管理者ログイン</button>
+        </div>
+      </div>
+      <div style={{ maxWidth: 900, margin: "16px auto 0", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.15)", textAlign: "center", fontSize: 12, opacity: 0.5 }}>
+        © 2025 CloudFan. All rights reserved.
+      </div>
+    </footer>
+  );
+
+  // =============================================
+  // レンダリング
+  // =============================================
+  return (
+    <div style={{ minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif" }}>
+      <NavBar />
+      <Hero />
+      <StatsBar />
+
+      {/* プロジェクト一覧 */}
+      <div id="projects" style={{ padding: "64px 24px", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <h2 style={{ fontSize: 26, fontWeight: 800, color: "#1e3a5f", marginBottom: 8 }}>募集中のプロジェクト</h2>
+          <p style={{ color: "#6b7280", fontSize: 15 }}>あなたの支援が夢への第一歩になります</p>
+        </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: "3rem", color: "#888" }}>読み込み中...</div>
+          <div style={{ textAlign: "center", padding: 60, color: "#6b7280" }}>読み込み中...</div>
         ) : projects.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem", color: "#888" }}>
-            現在募集中のプロジェクトはありません
+          <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🏅</div>
+            <p>現在募集中のプロジェクトはありません</p>
           </div>
         ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-            gap: "1.5rem",
-          }}>
-            {projects.map((project) => {
-              const { total, count } = getStats(project.id);
-              const goal = project.goal ?? 500000;
-              const pct = Math.min(Math.round((total / goal) * 100), 100);
-              const daysLeft = calcDaysLeft(project.deadline);
-              const minTier = project.tiers?.length > 0
-                ? Math.min(...project.tiers.map((t) => t.amount))
-                : 1000;
-
-              return (
-                <div key={project.id} style={{
-                  background: "#fff", borderRadius: "12px",
-                  boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-                  overflow: "hidden", transition: "transform 0.2s, box-shadow 0.2s",
-                }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)";
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)";
-                  }}
-                >
-                  {/* カードヘッダー */}
-                  <div style={{
-                    background: "linear-gradient(135deg, #1a3a5c, #2d6a9f)",
-                    padding: "1.25rem", color: "#fff",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div>
-                        <div style={{ fontSize: "0.8rem", opacity: 0.8, marginBottom: "0.25rem" }}>
-                          {project.school}
-                        </div>
-                        <div style={{ fontWeight: "bold", fontSize: "0.95rem" }}>
-                          {project.club}
-                        </div>
-                      </div>
-                      <span style={{
-                        background: daysLeft <= 7 ? "#e55" : "#f0a500",
-                        padding: "0.25rem 0.6rem", borderRadius: "20px",
-                        fontSize: "0.75rem", fontWeight: "bold",
-                        whiteSpace: "nowrap",
-                      }}>
-                        残り{daysLeft}日
-                      </span>
-                    </div>
-                    <h3 style={{ margin: "0.75rem 0 0", fontSize: "1rem", lineHeight: 1.4 }}>
-                      {project.title}
-                    </h3>
-                  </div>
-
-                  {/* カードボディ */}
-                  <div style={{ padding: "1.25rem" }}>
-                    {/* 達成率バー */}
-                    <div style={{ marginBottom: "1rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", fontSize: "0.85rem" }}>
-                        <span style={{ color: "#666" }}>達成率</span>
-                        <span style={{ fontWeight: "bold", color: "#1a3a5c" }}>{pct}%</span>
-                      </div>
-                      <div style={{ background: "#e8f0fe", borderRadius: "10px", height: "8px", overflow: "hidden" }}>
-                        <div style={{
-                          width: `${pct}%`, height: "100%",
-                          background: "linear-gradient(90deg, #2d6a9f, #f0a500)",
-                          borderRadius: "10px", transition: "width 0.8s ease",
-                        }} />
-                      </div>
-                    </div>
-
-                    {/* 統計 */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "1rem", textAlign: "center" }}>
-                      {[
-                        { v: `¥${total.toLocaleString()}`, l: "支援総額" },
-                        { v: `${count}名`, l: "支援者" },
-                        { v: `¥${goal.toLocaleString()}`, l: "目標金額" },
-                      ].map(({ v, l }) => (
-                        <div key={l} style={{ background: "#f8fafc", borderRadius: "8px", padding: "0.5rem" }}>
-                          <div style={{ fontSize: "0.9rem", fontWeight: "bold", color: "#1a3a5c" }}>{v}</div>
-                          <div style={{ fontSize: "0.7rem", color: "#888" }}>{l}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 説明文 */}
-                    {project.description && (
-                      <p style={{ color: "#555", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1rem",
-                                  display: "-webkit-box", WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                        {project.description}
-                      </p>
-                    )}
-
-                    {/* ボタン */}
-                    <div style={{ display: "flex", gap: "0.75rem" }}>
-                      <Link href={`/projects/${project.id}`} style={{
-                        flex: 1, padding: "0.7rem", textAlign: "center",
-                        background: "#f0f4f8", color: "#1a3a5c",
-                        borderRadius: "8px", textDecoration: "none",
-                        fontSize: "0.9rem", fontWeight: "bold",
-                      }}>
-                        詳細を見る
-                      </Link>
-                      <Link href={`/support?project=${project.id}`} style={{
-                        flex: 1, padding: "0.7rem", textAlign: "center",
-                        background: "linear-gradient(135deg, #f0a500, #e55)",
-                        color: "#fff", borderRadius: "8px", textDecoration: "none",
-                        fontSize: "0.9rem", fontWeight: "bold",
-                      }}>
-                        ¥{minTier.toLocaleString()}〜 支援する
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* ── 支援の流れ ── */}
-      <section style={{ background: "#1a3a5c", padding: "3rem 2rem" }}>
-        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-          <h2 style={{ color: "#fff", textAlign: "center", fontSize: "1.6rem", marginBottom: "2rem" }}>
-            ✨ 支援の流れ
-          </h2>
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "1rem",
-          }}>
-            {STEPS.map((step) => (
-              <div key={step.title} style={{
-                background: "rgba(255,255,255,0.1)", borderRadius: "12px",
-                padding: "1.5rem 1rem", textAlign: "center", color: "#fff",
-              }}>
-                <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>{step.icon}</div>
-                <div style={{ fontSize: "0.75rem", color: "#f0a500", fontWeight: "bold", marginBottom: "0.25rem" }}>{step.title}</div>
-                <div style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>{step.label}</div>
-                <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>{step.desc}</div>
-              </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: 28 }}>
+            {projects.map((p) => (
+              <ProjectCard key={p.id} project={p} />
             ))}
           </div>
-        </div>
-      </section>
+        )}
+      </div>
 
-      {/* ── フッター ── */}
-      <footer style={{
-        background: "#0f2233", color: "#aaa",
-        padding: "2rem", textAlign: "center",
-      }}>
-        <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>⛅ CloudFan</div>
-        <p style={{ margin: "0 0 1rem", fontSize: "0.9rem" }}>北海道の部活動を応援するクラウドファンディング</p>
-        <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "1rem", fontSize: "0.85rem" }}>
-          <Link href="/admin" style={{ color: "#aaa", textDecoration: "none" }}>管理画面</Link>
-          <span>|</span>
-          <a href="mailto:narabadocf@gmail.com" style={{ color: "#aaa", textDecoration: "none" }}>お問い合わせ</a>
-        </div>
-        <p style={{ margin: 0, fontSize: "0.8rem" }}>© 2026 CloudFan. All rights reserved.</p>
-      </footer>
+      <HowTo />
+      <Footer />
     </div>
   );
 }
