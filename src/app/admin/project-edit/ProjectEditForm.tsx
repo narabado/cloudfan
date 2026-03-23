@@ -29,12 +29,12 @@ export default function ProjectEditForm() {
     if (!isEdit || !idParam) return;
     (async () => {
       const { data, error } = await supabase
-        .from("プロジェクト")
+        .from("crowdfunding_projects")
         .select("*")
         .eq("id", Number(idParam))
         .single();
       if (error || !data) {
-        setError("プロジェクトデータの取得に失敗しました");
+        setError("crowdfunding_projectsデータの取得に失敗しました");
       } else {
         setForm({
           school:      data.school      ?? "",
@@ -73,13 +73,13 @@ export default function ProjectEditForm() {
       let dbError;
       if (isEdit && idParam) {
         const { error } = await supabase
-          .from("プロジェクト")
+          .from("crowdfunding_projects")
           .update(payload)
           .eq("id", Number(idParam));
         dbError = error;
       } else {
         const { error } = await supabase
-          .from("プロジェクト")
+          .from("crowdfunding_projects")
           .insert(payload);
         dbError = error;
       }
@@ -118,10 +118,10 @@ export default function ProjectEditForm() {
           ← 管理画面に戻る
         </Link>
         <h1 style={{ color: "#1a3a5c", fontWeight: 900, fontSize: "1.6rem", marginBottom: "0.25rem" }}>
-          {isEdit ? "✏️ プロジェクト編集" : "＋ 新規プロジェクト作成"}
+          {isEdit ? "✏️ crowdfunding_projects編集" : "＋ 新規crowdfunding_projects作成"}
         </h1>
         <p style={{ color: "#888", marginBottom: "2rem", fontSize: "0.9rem" }}>
-          {isEdit ? "プロジェクト情報を編集します（Supabase に保存）" : "新しいクラウドファンディングを作成します"}
+          {isEdit ? "crowdfunding_projects情報を編集します（Supabase に保存）" : "新しいクラウドファンディングを作成します"}
         </p>
         {error && (
           <div style={{ background: "#fff0f0", border: "1px solid #f5c0c0",
@@ -197,7 +197,7 @@ export default function ProjectEditForm() {
               style={{ ...inputStyle, minHeight: "180px", resize: "vertical" }}
               value={form.story}
               onChange={e => set("story", e.target.value)}
-              placeholder="プロジェクトの背景・支援金の使い道などを記載" />
+              placeholder="crowdfunding_projectsの背景・支援金の使い道などを記載" />
           </div>
           {/* メディア */}
           <div style={{ background: "#fff", borderRadius: "12px", padding: "1.5rem",
@@ -236,7 +236,7 @@ export default function ProjectEditForm() {
               fontSize: "1.1rem", fontWeight: 900,
               cursor: saving ? "not-allowed" : "pointer",
             }}>
-              {saving ? "⏳ 保存中..." : isEdit ? "💾 変更を保存" : "✅ プロジェクトを作成"}
+              {saving ? "⏳ 保存中..." : isEdit ? "💾 変更を保存" : "✅ crowdfunding_projectsを作成"}
             </button>
             <Link href="/admin" style={{
               padding: "1rem 1.5rem", background: "#f0f4fa",
