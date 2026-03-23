@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
@@ -37,7 +37,6 @@ export default function ProjectEditForm() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<Record<number, boolean>>({});
   const [dragOver, setDragOver] = useState<number | null>(null);
-  const fileInputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   useEffect(() => {
     if (!isEdit || !idParam) return;
@@ -75,7 +74,6 @@ export default function ProjectEditForm() {
   const addTier = () => setTiers(ts => [...ts, { name: "", amount: 0, description: "" }]);
   const removeTier = (i: number) => setTiers(ts => ts.filter((_, idx) => idx !== i));
 
-  // ── 画像アップロード ──
   const uploadImage = async (file: File, index: number) => {
     if (!file.type.startsWith("image/")) {
       setError("画像ファイル（PNG・JPG等）を選択してください");
@@ -87,10 +85,12 @@ export default function ProjectEditForm() {
       const ext = file.name.split(".").pop() ?? "png";
       const path = `projects/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from("images")
+        .from("プロジェクト画像")
         .upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage
+        .from("プロジェクト画像")
+        .getPublicUrl(path);
       const imgs = [...form.images];
       imgs[index] = publicUrl;
       set("images", imgs);
@@ -99,18 +99,6 @@ export default function ProjectEditForm() {
     } finally {
       setUploading(prev => ({ ...prev, [index]: false }));
     }
-  };
-
-  const handleDrop = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    setDragOver(null);
-    const file = e.dataTransfer.files[0];
-    if (file) uploadImage(file, index);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file) uploadImage(file, index);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -182,7 +170,7 @@ export default function ProjectEditForm() {
 
         <form onSubmit={handleSubmit}>
 
-          {/* ── 基本情報 ── */}
+          {/* 基本情報 */}
           <div style={cardStyle}>
             <h2 style={{ color:"#1a3a5c", fontWeight:900, marginTop:0, marginBottom:"1.25rem", fontSize:"1.1rem" }}>📋 基本情報</h2>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem", marginBottom:"1rem" }}>
@@ -223,7 +211,7 @@ export default function ProjectEditForm() {
             </div>
           </div>
 
-          {/* ── 支援ティア ── */}
+          {/* 支援ティア */}
           <div style={cardStyle}>
             <h2 style={{ color:"#1a3a5c", fontWeight:900, marginTop:0, marginBottom:"1rem", fontSize:"1.1rem" }}>🏅 支援ティア・特典</h2>
             <p style={{ color:"#888", fontSize:"0.83rem", marginBottom:"1.2rem" }}>各ティアの名称・最低支援金額・特典内容を編集できます</p>
@@ -253,54 +241,54 @@ export default function ProjectEditForm() {
             </button>
           </div>
 
-          {/* ── ストーリー ── */}
+          {/* ストーリー */}
           <div style={cardStyle}>
             <h2 style={{ color:"#1a3a5c", fontWeight:900, marginTop:0, marginBottom:"1.25rem", fontSize:"1.1rem" }}>📖 ストーリー</h2>
             <textarea style={{ ...inputStyle, minHeight:"180px", resize:"vertical" }} value={form.story} onChange={e => set("story", e.target.value)} placeholder="プロジェクトの背景・支援金の使い道などを記載" />
           </div>
 
-          {/* ── メディア（ドラッグ＆ドロップ） ── */}
+          {/* メディア */}
           <div style={cardStyle}>
             <h2 style={{ color:"#1a3a5c", fontWeight:900, marginTop:0, marginBottom:"0.5rem", fontSize:"1.1rem" }}>🖼️ メディア</h2>
             <p style={{ color:"#888", fontSize:"0.85rem", marginBottom:"1.25rem" }}>
               画像をドラッグ＆ドロップ、またはクリックして選択（PNG・JPG対応）
             </p>
-
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:"1rem", marginBottom:"1.25rem" }}>
               {form.images.map((img, i) => (
                 <div key={i}>
-                  <label style={labelStyle}>
+                  <div style={{ color:"#1a3a5c", fontWeight:700, marginBottom:"0.35rem", fontSize:"0.82rem" }}>
                     写真 {i + 1}{i === 0 ? "（メイン）" : ""}
-                  </label>
-
-                  {/* 隠しinput */}
+                  </div>
                   <input
-                    ref={fileInputRefs[i]}
+                    id={`img-upload-${i}`}
                     type="file"
                     accept="image/*"
                     style={{ display:"none" }}
-                    onChange={e => handleFileChange(e, i)}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadImage(file, i);
+                      e.target.value = "";
+                    }}
                   />
-
-                  {/* ドロップゾーン */}
-                  <div
-                    onClick={() => fileInputRefs[i].current?.click()}
+                  <label
+                    htmlFor={`img-upload-${i}`}
                     onDragOver={e => { e.preventDefault(); setDragOver(i); }}
                     onDragLeave={() => setDragOver(null)}
-                    onDrop={e => handleDrop(e, i)}
+                    onDrop={e => {
+                      e.preventDefault();
+                      setDragOver(null);
+                      const file = e.dataTransfer.files[0];
+                      if (file) uploadImage(file, i);
+                    }}
                     style={{
+                      display:"flex", flexDirection:"column",
+                      alignItems:"center", justifyContent:"center",
                       border: dragOver === i ? "2px solid #1a3a5c" : "2px dashed #b0c4de",
-                      borderRadius: "10px",
-                      background: dragOver === i ? "#e8f0fe" : img ? "#000" : "#f8fafd",
-                      cursor: "pointer",
-                      height: "130px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                      position: "relative",
-                      transition: "all 0.2s",
+                      borderRadius:"10px",
+                      background: dragOver === i ? "#e8f0fe" : "#f8fafd",
+                      cursor:"pointer", height:"130px",
+                      overflow:"hidden", position:"relative",
+                      transition:"all 0.2s",
                     }}
                   >
                     {uploading[i] ? (
@@ -311,16 +299,8 @@ export default function ProjectEditForm() {
                     ) : img ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={img}
-                          alt={`写真${i + 1}`}
-                          style={{ width:"100%", height:"100%", objectFit:"cover" }}
-                        />
-                        <div style={{
-                          position:"absolute", bottom:0, left:0, right:0,
-                          background:"rgba(0,0,0,0.5)", color:"#fff",
-                          fontSize:"0.7rem", padding:"3px 6px", textAlign:"center",
-                        }}>
+                        <img src={img} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                        <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(0,0,0,0.5)", color:"#fff", fontSize:"0.7rem", padding:"3px 6px", textAlign:"center" }}>
                           クリックで変更
                         </div>
                       </>
@@ -330,9 +310,7 @@ export default function ProjectEditForm() {
                         ドロップ or クリック
                       </div>
                     )}
-                  </div>
-
-                  {/* 削除ボタン */}
+                  </label>
                   {img && !uploading[i] && (
                     <button
                       type="button"
@@ -345,15 +323,13 @@ export default function ProjectEditForm() {
                 </div>
               ))}
             </div>
-
-            {/* YouTube */}
             <div>
               <label style={labelStyle}>YouTube 動画URL（任意）</label>
               <input style={inputStyle} value={form.youtube_url} onChange={e => set("youtube_url", e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
             </div>
           </div>
 
-          {/* ── ボタン ── */}
+          {/* ボタン */}
           <div style={{ display:"flex", gap:"1rem" }}>
             <button type="submit" disabled={saving} style={{ flex:1, padding:"1rem", background: saving ? "#ccc" : "#d4af37", color:"#0a1628", border:"none", borderRadius:"10px", fontSize:"1.1rem", fontWeight:900, cursor: saving ? "not-allowed" : "pointer" }}>
               {saving ? "⏳ 保存中..." : isEdit ? "💾 変更を保存" : "✅ プロジェクトを作成"}
