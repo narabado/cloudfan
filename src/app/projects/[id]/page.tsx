@@ -1,262 +1,233 @@
-"use client";
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+'use client';
 
-const DEFAULT_TIERS = [
-  { name: "ブロンズ",   amount: 1000,   description: "お礼メール＋活動報告レポート送付" },
-  { name: "シルバー",   amount: 3000,   description: "上記＋クラブオリジナルステッカー" },
-  { name: "ゴールド",   amount: 10000,  description: "上記＋選手からの直筆サイン色紙" },
-  { name: "プラチナ",   amount: 30000,  description: "上記＋練習見学招待＋記念写真撮影" },
-  { name: "レジェンド", amount: 100000, description: "上記＋スポンサー名をユニフォームに掲載" },
-];
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
-const tierColor: Record<string, string> = {
-  ブロンズ: "#cd7f32", シルバー: "#aaa", ゴールド: "#d4af37", プラチナ: "#5be", レジェンド: "#e55",
-};
-const tierIcon: Record<string, string> = {
-  ブロンズ: "🥉", シルバー: "🥈", ゴールド: "🥇", プラチナ: "💎", レジェンド: "👑",
-};
-
-type Tier = { name: string; amount: number; description: string };
-type Supporter = { name: string; tier: string; total_amount: number; message: string; created_at: string };
-
-function toISODate(jpDate: string): string {
-  const m = jpDate.match(/(\d+)年(\d+)月(\d+)日/);
-  if (!m) return jpDate;
-  return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+interface Tier {
+  id: number;
+  project_id: number;
+  name: string;
+  amount: number;
+  description: string;
+  max_supporters: number | null;
+  current_supporters: number;
 }
 
-export default function ProjectDetail() {
-  const params    = useParams();
-  const projectId = Number(params.id ?? 1);   // ← URLの[id]を使用
+interface Project {
+  id: number;
+  title: string;
+  description: string;
+  story: string;
+  school: string;
+  club: string;
+  goal_amount: number;
+  current_amount: number;
+  deadline: string;
+  status: string;
+  youtube_url: string | null;
+  images: string[] | null;
+  region: string;
+}
 
-  const [project,    setProject]    = useState<any>(null);
-  const [tiers,      setTiers]      = useState<Tier[]>(DEFAULT_TIERS);
-  const [supporters, setSupporters] = useState<Supporter[]>([]);
-  const [projLoading, setProjLoading] = useState(true);
-  const [supLoading,  setSupLoading]  = useState(true);
+export default function ProjectPage() {
+  const params = useParams();
+  const router = useRouter();
+  const [project, setProject] = useState<Project | null>(null);
+  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<number>(0);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("crowdfunding_projects")
-        .select("*")
-        .eq("id", projectId)   // ← 動的
-        .single();
-      if (data) {
-        setProject(data);
-        if (Array.isArray(data.tiers) && data.tiers.length > 0) setTiers(data.tiers);
-      }
-      setProjLoading(false);
-    })();
+    const projectId = params.id as string;
+    fetchProject(projectId);
+    fetchTiers(projectId);
+  }, [params.id]);
 
-    (async () => {
-      const { data } = await supabase
-        .from("supporters")
-        .select("name, tier, total_amount, message, created_at")
-        .eq("status", "approved")
-        .eq("project_id", projectId)   // ← 動的
-        .order("total_amount", { ascending: false });
-      setSupporters((data as Supporter[]) ?? []);
-      setSupLoading(false);
-    })();
-  }, [projectId]);
+  async function fetchProject(id: string) {
+    const { data, error } = await supabase
+      .from('crowdfunding_projects')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) {
+      setError('プロジェクトが見つかりませんでした');
+    } else {
+      setProject(data);
+    }
+    setLoading(false);
+  }
 
-  const goal       = project?.goal     ?? 500000;
-  const title      = project?.title    ?? "";
-  const school     = project?.school   ?? "";
-  const club       = project?.club     ?? "";
-  const story      = project?.story    ?? "";
-  const deadline   = project?.deadline ?? "";
-  const youtubeUrl = project?.youtube_url ?? "";
+  async function fetchTiers(id: string) {
+    const { data } = await supabase
+      .from('project_tiers')
+      .select('*')
+      .eq('project_id', id)
+      .order('amount', { ascending: true });
+    if (data) setTiers(data);
+  }
 
-  const deadlineISO = toISODate(deadline);
-  const totalAmount = supporters.reduce((s, r) => s + (r.total_amount || 0), 0);
-  const pct         = goal ? Math.min(Math.round((totalAmount / goal) * 100), 100) : 0;
-  const daysLeft    = Math.max(0, Math.ceil((new Date(deadlineISO).getTime() - Date.now()) / 86400000));
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f7f9fc' }}>
+      <p style={{ color: '#1a3a5c', fontSize: '1.1rem' }}>読み込み中...</p>
+    </div>
+  );
 
-  const siteUrl   = `https://cloudfan.vercel.app/projects/${projectId}`;
-  const shareText = encodeURIComponent(`${title} を応援しています！ #バドミントン #北海道`);
-  const fbUrl     = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}`;
-  const twUrl     = `https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(siteUrl)}`;
-  const lineUrl   = `https://line.me/R/msg/text/?${encodeURIComponent(title + "\n" + siteUrl)}`;
+  if (error || !project) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f7f9fc' }}>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ color: '#e55', marginBottom: '1rem' }}>{error || 'プロジェクトが見つかりません'}</p>
+        <Link href="/" style={{ color: '#1a6fc4' }}>トップに戻る</Link>
+      </div>
+    </div>
+  );
+
+  const progress = Math.min(100, Math.round((project.current_amount / project.goal_amount) * 100));
+  const daysLeft = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000));
+  const validImages = (project.images ?? []).filter(url => url && url.trim() !== '');
 
   return (
-    <>
-      <style>{`
-        * { box-sizing: border-box; }
-        .project-nav { background:#0a1628;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #d4af37;position:sticky;top:0;z-index:100; }
-        .nav-title { font-size:16px;font-weight:bold;color:#d4af37;text-decoration:none; }
-        .nav-links { display:flex;gap:16px; }
-        .nav-link { color:#ccc;font-size:13px;text-decoration:none;white-space:nowrap; }
-        .nav-link:hover { color:#d4af37; }
-        .project-layout { max-width:1100px;margin:0 auto;padding:32px 20px;display:flex;gap:32px;align-items:flex-start; }
-        .project-main { flex:1;min-width:0; }
-        .project-sidebar { width:320px;flex-shrink:0;position:sticky;top:80px; }
-        .sidebar-mobile { display:none; }
-        .sidebar-desktop { display:block; }
-        .progress-bar-bg { background:#e2e8f0;border-radius:99px;height:12px;overflow:hidden;margin:8px 0; }
-        .progress-bar-fill { background:linear-gradient(90deg,#d4af37,#f0c040);border-radius:99px;height:100%;transition:width .6s; }
-        .tier-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px; }
-        .supporter-table { width:100%;border-collapse:collapse;font-size:14px; }
-        .supporter-table th { background:#0a1628;color:#fff;padding:10px 14px;text-align:left; }
-        .supporter-table td { padding:10px 14px;border-bottom:1px solid #e2e8f0; }
-        .supporter-table tr:nth-child(even) td { background:#f9fafb; }
-        .share-btns { display:flex;gap:8px; }
-        .share-btn { flex:1;text-align:center;border-radius:8px;padding:9px 4px;font-size:13px;font-weight:bold;text-decoration:none; }
-        @media(max-width:767px){
-          .project-nav { padding:12px 16px; }
-          .nav-title { font-size:13px; }
-          .nav-link { font-size:12px; }
-          .nav-links { gap:10px; }
-          .project-layout { flex-direction:column;padding:0 0 32px 0;gap:0; }
-          .project-main { padding:16px; }
-          .project-sidebar { width:100%;position:static; }
-          .sidebar-mobile { display:block;padding:0 16px 16px 16px; }
-          .sidebar-desktop { display:none; }
-          .tier-grid { grid-template-columns:1fr; }
-          .supporter-table { font-size:12px; }
-          .supporter-table th,.supporter-table td { padding:8px 10px; }
-          .table-wrap { overflow-x:auto;-webkit-overflow-scrolling:touch; }
-        }
-      `}</style>
+    <div style={{ background: '#f7f9fc', minHeight: '100vh' }}>
 
-      <div style={{ fontFamily:"sans-serif", minHeight:"100vh", background:"#f5f7fa" }}>
-        <nav className="project-nav">
-          <Link href="/" className="nav-title">🏸 BADMINTON SUPPORT HOKKAIDO</Link>
-          <div className="nav-links">
-            <Link href="/" className="nav-link">← トップ</Link>
-            <Link href={`/admin/project-edit?id=${projectId}`} className="nav-link">✏️ 編集</Link>
-          </div>
+      {/* ヘッダー */}
+      <header style={{ background: 'linear-gradient(135deg, #1a3a5c 0%, #2a6496 100%)', padding: '1.2rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+        <Link href="/" style={{ color: '#fff', textDecoration: 'none', fontSize: '1.3rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+          ⚽ CloudFan
+        </Link>
+        <nav style={{ display: 'flex', gap: '1.5rem' }}>
+          <Link href="/" style={{ color: '#cde', textDecoration: 'none', fontSize: '0.95rem' }}>ホーム</Link>
+          <Link href="/projects" style={{ color: '#cde', textDecoration: 'none', fontSize: '0.95rem' }}>プロジェクト一覧</Link>
         </nav>
+      </header>
 
-        <div style={{ background:"linear-gradient(135deg,#0a1628 0%,#1a3060 100%)",padding:"40px 20px",textAlign:"center" }}>
-          {projLoading ? (
-            <div style={{ color:"#aac", fontSize:14 }}>読み込み中...</div>
-          ) : (
-            <>
-              <div style={{ display:"inline-block",background:"#d4af37",color:"#0a1628",borderRadius:6,padding:"3px 12px",fontSize:12,fontWeight:"bold",marginBottom:12 }}>
-                募集中
-              </div>
-              <h1 style={{ color:"#fff",fontSize:"clamp(18px,4vw,28px)",fontWeight:"bold",maxWidth:700,margin:"0 auto 8px",lineHeight:1.4 }}>{title}</h1>
-              <p style={{ color:"#aac",fontSize:14 }}>{school}　{club}</p>
-            </>
-          )}
+      <main style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+
+        {/* タイトル */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
+            <span style={{ background: '#e8f0fe', color: '#1a3a5c', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>{project.school}</span>
+            <span style={{ background: '#e8f0fe', color: '#1a3a5c', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>{project.club}</span>
+            <span style={{ background: '#fff3cd', color: '#856404', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}>📍 {project.region}</span>
+          </div>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1a3a5c', marginBottom: '0.5rem' }}>{project.title}</h1>
+          <p style={{ color: '#4a6080', fontSize: '1rem', lineHeight: 1.6 }}>{project.description}</p>
         </div>
 
-        <div className="sidebar-mobile">
-          <SidebarCard totalAmount={totalAmount} pct={pct} goal={goal} supporters={supporters} daysLeft={daysLeft} deadline={deadline} twUrl={twUrl} lineUrl={lineUrl} fbUrl={fbUrl} projectId={projectId} />
-        </div>
-
-        <div className="project-layout">
-          <div className="project-main">
-            <section style={{ background:"#fff",borderRadius:12,padding:24,marginBottom:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-              <h2 style={{ color:"#0a1628",fontSize:18,borderBottom:"2px solid #d4af37",paddingBottom:8,marginBottom:16 }}>📖 プロジェクト詳細</h2>
-              <div style={{ lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap",fontSize:15 }}>
-                {projLoading ? "読み込み中..." : story}
-              </div>
-            </section>
-
-            {!projLoading && youtubeUrl && (
-              <section style={{ background:"#fff",borderRadius:12,padding:24,marginBottom:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-                <h2 style={{ color:"#0a1628",fontSize:18,borderBottom:"2px solid #d4af37",paddingBottom:8,marginBottom:16 }}>🎬 紹介動画</h2>
-                <div style={{ position:"relative",paddingBottom:"56.25%",height:0,borderRadius:8,overflow:"hidden" }}>
-                  <iframe src={youtubeUrl.replace("watch?v=","embed/")} style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none" }} allowFullScreen />
-                </div>
-              </section>
-            )}
-
-            <section style={{ background:"#fff",borderRadius:12,padding:24,marginBottom:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-              <h2 style={{ color:"#0a1628",fontSize:18,borderBottom:"2px solid #d4af37",paddingBottom:8,marginBottom:16 }}>🎁 支援ティア・特典</h2>
-              <div className="tier-grid">
-                {tiers.map((t, i) => (
-                  <div key={i} style={{ border:`2px solid ${tierColor[t.name]??"#ddd"}`,borderRadius:10,padding:16 }}>
-                    <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:8 }}>
-                      <span style={{ background:tierColor[t.name]??"#ddd",color:"#fff",borderRadius:6,padding:"2px 10px",fontSize:12,fontWeight:"bold" }}>
-                        {tierIcon[t.name]??""} {t.name}
-                      </span>
-                      <span style={{ fontWeight:"bold",color:"#0a1628" }}>¥{t.amount.toLocaleString()}〜</span>
-                    </div>
-                    <p style={{ fontSize:13,color:"#555",margin:0,lineHeight:1.6 }}>{t.description}</p>
-                    <Link href={`/support?project=${projectId}&tier=${encodeURIComponent(t.name)}&amount=${t.amount}`}
-                      style={{ display:"block",marginTop:12,background:tierColor[t.name]??"#d4af37",color:"#fff",textAlign:"center",borderRadius:6,padding:"8px",fontSize:13,fontWeight:"bold",textDecoration:"none" }}>
-                      このティアで支援
-                    </Link>
+        {/* ── 画像ギャラリー ── */}
+        {validImages.length > 0 && (
+          <div style={{ marginBottom: '2rem' }}>
+            {/* メイン画像 */}
+            <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '0.75rem', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+              <img
+                src={validImages[selectedImage]}
+                alt={`${project.title} - 画像${selectedImage + 1}`}
+                style={{ width: '100%', height: '420px', objectFit: 'cover', display: 'block' }}
+              />
+            </div>
+            {/* サムネイル（複数枚のときのみ表示） */}
+            {validImages.length > 1 && (
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                {validImages.map((url, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setSelectedImage(i)}
+                    style={{
+                      width: '88px', height: '64px', borderRadius: '8px', overflow: 'hidden',
+                      cursor: 'pointer',
+                      border: selectedImage === i ? '3px solid #1a6fc4' : '3px solid transparent',
+                      opacity: selectedImage === i ? 1 : 0.6,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={`サムネイル${i + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
                   </div>
                 ))}
               </div>
-            </section>
+            )}
+          </div>
+        )}
 
-            <section style={{ background:"#fff",borderRadius:12,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-              <h2 style={{ color:"#0a1628",fontSize:18,borderBottom:"2px solid #d4af37",paddingBottom:8,marginBottom:16 }}>👥 支援者一覧（{supporters.length}名）</h2>
-              {supLoading ? (
-                <p style={{ color:"#888",textAlign:"center",padding:32 }}>読み込み中...</p>
-              ) : supporters.length === 0 ? (
-                <p style={{ color:"#888",textAlign:"center",padding:32 }}>まだ支援者はいません。最初の支援者になりましょう！</p>
-              ) : (
-                <div className="table-wrap">
-                  <table className="supporter-table">
-                    <thead><tr><th>名前</th><th>ティア</th><th>金額</th><th>コメント</th></tr></thead>
-                    <tbody>
-                      {supporters.map((s, i) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight:"bold" }}>{s.name}</td>
-                          <td><span style={{ color:tierColor[s.tier]??"#333",fontWeight:"bold" }}>{tierIcon[s.tier]??""}{s.tier}</span></td>
-                          <td style={{ fontWeight:"bold",color:"#d4af37" }}>¥{(s.total_amount||0).toLocaleString()}</td>
-                          <td style={{ color:"#555",fontSize:12 }}>{s.message||"—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        {/* 進捗 */}
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a6fc4' }}>¥{project.current_amount.toLocaleString()}</span>
+            <span style={{ color: '#888', fontSize: '0.9rem' }}>目標 ¥{project.goal_amount.toLocaleString()}</span>
+          </div>
+          <div style={{ background: '#e8f0fe', borderRadius: '8px', height: '12px', marginBottom: '0.8rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #1a6fc4, #2a9fd6)', width: `${progress}%`, height: '100%', borderRadius: '8px', transition: 'width 0.5s' }} />
+          </div>
+          <div style={{ display: 'flex', gap: '2rem' }}>
+            <span style={{ color: '#4a6080' }}>達成率: <strong style={{ color: '#1a6fc4' }}>{progress}%</strong></span>
+            <span style={{ color: '#4a6080' }}>残り: <strong style={{ color: '#e55' }}>{daysLeft}日</strong></span>
+          </div>
+        </div>
+
+        {/* 動画 */}
+        {project.youtube_url && (
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1a3a5c', marginBottom: '1rem' }}>🎥 紹介動画</h2>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: '12px', overflow: 'hidden' }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${
+                  project.youtube_url.includes('youtu.be/')
+                    ? project.youtube_url.split('youtu.be/')[1]
+                    : project.youtube_url.split('v=')[1]?.split('&')[0]
+                }`}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ストーリー */}
+        {project.story && (
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1a3a5c', marginBottom: '1rem' }}>📖 私たちのストーリー</h2>
+            <p style={{ color: '#4a6080', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{project.story}</p>
+          </div>
+        )}
+
+        {/* 支援ティア */}
+        {tiers.length > 0 && (
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1a3a5c', marginBottom: '1rem' }}>🎁 支援コース</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {tiers.map(tier => (
+                <div key={tier.id} style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem 1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '2px solid #e8f0fe' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ fontWeight: 700, color: '#1a3a5c', margin: 0 }}>{tier.name}</h3>
+                    <span style={{ fontWeight: 700, color: '#1a6fc4', fontSize: '1.2rem' }}>¥{tier.amount.toLocaleString()}</span>
+                  </div>
+                  <p style={{ color: '#4a6080', margin: '0 0 0.8rem', lineHeight: 1.6 }}>{tier.description}</p>
+                  {tier.max_supporters && (
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>
+                      残り {Math.max(0, tier.max_supporters - tier.current_supporters)} / {tier.max_supporters} 名
+                    </p>
+                  )}
+                  <button
+                    onClick={() => router.push(`/support/${project.id}?tier=${tier.id}`)}
+                    style={{ background: 'linear-gradient(90deg, #1a6fc4, #2a9fd6)', color: '#fff', border: 'none', padding: '0.65rem 1.5rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}
+                  >
+                    このコースで支援する
+                  </button>
                 </div>
-              )}
-            </section>
+              ))}
+            </div>
           </div>
+        )}
 
-          <aside className="project-sidebar sidebar-desktop">
-            <SidebarCard totalAmount={totalAmount} pct={pct} goal={goal} supporters={supporters} daysLeft={daysLeft} deadline={deadline} twUrl={twUrl} lineUrl={lineUrl} fbUrl={fbUrl} projectId={projectId} />
-          </aside>
+        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+          <Link href="/projects" style={{ color: '#1a6fc4', textDecoration: 'none', fontSize: '0.95rem' }}>← プロジェクト一覧に戻る</Link>
         </div>
-      </div>
-    </>
-  );
-}
 
-function SidebarCard({ totalAmount, pct, goal, supporters, daysLeft, deadline, twUrl, lineUrl, fbUrl, projectId }:
-  { totalAmount:number; pct:number; goal:number; supporters:Supporter[]; daysLeft:number; deadline:string; twUrl:string; lineUrl:string; fbUrl:string; projectId:number }) {
-  return (
-    <div style={{ background:"#fff",borderRadius:12,padding:24,boxShadow:"0 4px 16px rgba(0,0,0,.10)",border:"2px solid #d4af37" }}>
-      <div style={{ marginBottom:16 }}>
-        <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-          <span style={{ fontSize:13,color:"#888" }}>達成率</span>
-          <span style={{ fontWeight:"bold",color:"#d4af37",fontSize:18 }}>{pct}%</span>
-        </div>
-        <div className="progress-bar-bg"><div className="progress-bar-fill" style={{ width:`${pct}%` }} /></div>
-      </div>
-      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20 }}>
-        {[
-          { label:"支援総額", value:`¥${totalAmount.toLocaleString()}`, sub:`目標 ¥${goal.toLocaleString()}` },
-          { label:"支援者数", value:`${supporters.length}名`, sub:"" },
-          { label:"残り日数", value:`${daysLeft}日`, sub:deadline+"まで" },
-          { label:"達成率",   value:`${pct}%`, sub:"" },
-        ].map(c => (
-          <div key={c.label} style={{ background:"#f5f7fa",borderRadius:8,padding:12,textAlign:"center" }}>
-            <div style={{ fontSize:11,color:"#888" }}>{c.label}</div>
-            <div style={{ fontWeight:"bold",fontSize:18,color:"#0a1628" }}>{c.value}</div>
-            {c.sub && <div style={{ fontSize:10,color:"#aaa" }}>{c.sub}</div>}
-          </div>
-        ))}
-      </div>
-      <Link href={`/support?project=${projectId}`} style={{ display:"block",background:"linear-gradient(135deg,#d4af37,#f0c040)",color:"#0a1628",textAlign:"center",borderRadius:10,padding:"14px",fontSize:16,fontWeight:"bold",textDecoration:"none",marginBottom:12,boxShadow:"0 4px 12px rgba(212,175,55,.4)" }}>
-        🏸 このプロジェクトを支援する
-      </Link>
-      <div className="share-btns">
-        <a href={twUrl} target="_blank" rel="noreferrer" className="share-btn" style={{ background:"#000",color:"#fff" }}>𝕏 シェア</a>
-        <a href={lineUrl} target="_blank" rel="noreferrer" className="share-btn" style={{ background:"#06c755",color:"#fff" }}>LINE</a>
-        <a href={fbUrl} target="_blank" rel="noreferrer" className="share-btn" style={{ background:"#1877f2",color:"#fff" }}>Facebook</a>
-      </div>
+      </main>
     </div>
   );
 }
