@@ -14,8 +14,16 @@ export default function NavBar() {
       height: '64px', position: 'sticky', top: 0, zIndex: 100,
       borderBottom: '1px solid rgba(255,255,255,0.1)'
     }}>
-      <Link href="/" style={{ color: '#d4960a', fontWeight: 900, fontSize: '15px', letterSpacing: '0.05em', textDecoration: 'none' }}>
-        🏸 BADMINTON SUPPORT HOKKAIDO
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+        <img
+          src="/logo.png"
+          alt="ならバド"
+          style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
+        <span style={{ color: '#d4960a', fontWeight: 900, fontSize: '15px', letterSpacing: '0.05em' }}>
+          CLOUDFAN
+        </span>
       </Link>
       <div style={{ display: 'flex', gap: '8px' }}>
         <Link href="/projects" style={{
