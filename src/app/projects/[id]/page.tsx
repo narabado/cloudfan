@@ -8,7 +8,12 @@ interface Project {
   id: number; title: string; description: string; story: string;
   school: string; club: string; goal: number; status: string;
   youtube_url: string | null; images: string[] | null;
-  region: string; deadline: string;
+  region: string; deadline: string | null;
+  tiers: TierJson[] | null;
+}
+interface TierJson {
+  name: string; amount: number; description: string;
+  max_supporters?: number | null;
 }
 interface Tier {
   id: number; project_id: number; name: string; amount: number;
@@ -31,7 +36,7 @@ export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
-  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [dbTiers, setDbTiers] = useState<Tier[]>([]);
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [totalRaised, setTotalRaised] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -54,8 +59,8 @@ export default function ProjectPage() {
     try {
       const { data } = await supabase.from('project_tiers').select('*')
         .eq('project_id', id).order('amount', { ascending: true });
-      if (data) setTiers(data);
-    } catch { setTiers([]); }
+      if (data && data.length > 0) setDbTiers(data);
+    } catch { setDbTiers([]); }
   }
   async function fetchSupporters(id: string) {
     try {
@@ -82,12 +87,29 @@ export default function ProjectPage() {
     </div>
   );
 
-  const goalAmt    = project.goal ?? 1;
-  const progress   = Math.min(100, Math.round((totalRaised / goalAmt) * 100));
-  const daysLeft   = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000));
-  const validImages = (project.images ?? []).filter(url => url && url.trim() !== '');
-  const storyBlocks = (project.story ?? '').split('---').map(s => s.trim()).filter(s => s !== '');
-  const projectUrl  = `https://cloudfan.vercel.app/projects/${project.id}`;
+  const goalAmt     = project.goal ?? 1;
+  const progress    = Math.min(100, Math.round((totalRaised / goalAmt) * 100));
+
+  /* deadline が null や不正値でも NaN にならないよう安全に計算 */
+  const deadlineMs  = project.deadline ? new Date(project.deadline).getTime() : NaN;
+  const daysLeft    = isNaN(deadlineMs) ? null : Math.max(0, Math.ceil((deadlineMs - Date.now()) / 86400000));
+
+  const validImages  = (project.images ?? []).filter(url => url && url.trim() !== '');
+  const storyBlocks  = (project.story ?? '').split('---').map(s => s.trim()).filter(s => s !== '');
+  const projectUrl   = `https://cloudfan.vercel.app/projects/${project.id}`;
+
+  /* ティア：project_tiers テーブル優先、なければ project.tiers JSONB を使う */
+  const effectiveTiers: Tier[] = dbTiers.length > 0
+    ? dbTiers
+    : (project.tiers ?? []).map((t, i) => ({
+        id: i,
+        project_id: project.id,
+        name: t.name,
+        amount: t.amount,
+        description: t.description,
+        max_supporters: t.max_supporters ?? null,
+        current_supporters: 0,
+      }));
 
   return (
     <div style={{ background:'#f5f5f5', minHeight:'100vh', fontFamily:"'Noto Sans JP', sans-serif" }}>
@@ -119,7 +141,7 @@ export default function ProjectPage() {
           {/* ── 左カラム ── */}
           <div style={{ flex:'1 1 580px', minWidth:0 }}>
 
-            {/* メインビジュアル（1枚目） */}
+            {/* メインビジュアル */}
             {validImages.length > 0 ? (
               <div style={{ borderRadius:'12px', overflow:'hidden', boxShadow:'0 4px 16px rgba(0,0,0,0.12)', marginBottom:'1.5rem', aspectRatio:'16/9' }}>
                 <img src={validImages[0]} alt={project.title}
@@ -151,10 +173,9 @@ export default function ProjectPage() {
                 ))}
               </div>
 
-              {/* ── ストーリータブ ── */}
+              {/* ストーリータブ */}
               {activeTab === 'story' && (
                 <div>
-                  {/* YouTube */}
                   {project.youtube_url && (
                     <div style={{ marginBottom:'2rem' }}>
                       <div style={{ position:'relative', paddingBottom:'56.25%', height:0, borderRadius:'10px', overflow:'hidden' }}>
@@ -179,14 +200,12 @@ export default function ProjectPage() {
                         background:'#fff', borderRadius:'16px', padding:'1.5rem',
                         boxShadow:'0 2px 8px rgba(0,0,0,0.07)'
                       }}>
-                        {/* 写真：常に左 */}
                         {validImages[i] && (
                           <div style={{ flex:'0 0 42%', minWidth:'180px' }}>
                             <img src={validImages[i]} alt={`ストーリー${i+1}`}
                               style={{ width:'100%', borderRadius:'10px', objectFit:'cover', aspectRatio:'4/3', display:'block' }} />
                           </div>
                         )}
-                        {/* テキスト：常に右 */}
                         <div style={{ flex:'1 1 50%' }}>
                           <p style={{ color:'#333', lineHeight:1.9, whiteSpace:'pre-wrap', margin:0, fontSize:'0.97rem' }}>{block}</p>
                         </div>
@@ -231,14 +250,15 @@ export default function ProjectPage() {
             </div>
 
             {/* 支援ティア */}
-            {tiers.length > 0 && (
+            {effectiveTiers.length > 0 && (
               <div style={{ marginBottom:'2rem' }}>
                 <h2 style={{ fontSize:'1.1rem', fontWeight:700, color:'#222', marginBottom:'1rem' }}>🎁 支援コース</h2>
                 <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
-                  {tiers.map(tier => {
+                  {effectiveTiers.map(tier => {
                     const color = Object.entries(TIER_COLORS).find(([k]) => tier.name.includes(k))?.[1] ?? '#2a7bd5';
                     const icon  = Object.entries(TIER_ICONS ).find(([k]) => tier.name.includes(k))?.[1] ?? '⭐';
-                    const rem   = tier.max_supporters != null ? Math.max(0, tier.max_supporters - tier.current_supporters) : null;
+                    const rem   = tier.max_supporters != null
+                      ? Math.max(0, tier.max_supporters - tier.current_supporters) : null;
                     return (
                       <div key={tier.id} style={{ background:'#fff', borderRadius:'12px', padding:'1.25rem 1.5rem', boxShadow:'0 2px 6px rgba(0,0,0,0.06)', borderLeft:`4px solid ${color}` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.5rem' }}>
@@ -246,7 +266,9 @@ export default function ProjectPage() {
                           <span style={{ fontWeight:700, color, fontSize:'1.15rem' }}>¥{tier.amount.toLocaleString()}</span>
                         </div>
                         <p style={{ color:'#555', margin:'0 0 0.75rem', lineHeight:1.7, fontSize:'0.9rem' }}>{tier.description}</p>
-                        {rem !== null && <p style={{ color:'#888', fontSize:'0.82rem', margin:'0 0 0.75rem' }}>残り {rem} / {tier.max_supporters} 名</p>}
+                        {rem !== null && (
+                          <p style={{ color:'#888', fontSize:'0.82rem', margin:'0 0 0.75rem' }}>残り {rem} / {tier.max_supporters} 名</p>
+                        )}
                         <button onClick={() => router.push(`/support/${project.id}?tier=${tier.id}`)}
                           style={{ background:color, color:'#fff', border:'none', padding:'0.6rem 1.4rem', borderRadius:'6px', cursor:'pointer', fontWeight:600, fontSize:'0.9rem' }}>
                           このコースで支援する
@@ -262,7 +284,9 @@ export default function ProjectPage() {
           {/* ── 右サイドバー ── */}
           <div style={{ flex:'0 0 300px', minWidth:'260px', position:'sticky', top:'72px', alignSelf:'flex-start' }}>
             <div style={{ background:'#fff', borderRadius:'12px', padding:'1.5rem', boxShadow:'0 2px 12px rgba(0,0,0,0.1)' }}>
-              <p style={{ fontSize:'1.8rem', fontWeight:700, color:'#2a7bd5', margin:'0 0 0.25rem' }}>¥{totalRaised.toLocaleString()}</p>
+              <p style={{ fontSize:'1.8rem', fontWeight:700, color:'#2a7bd5', margin:'0 0 0.25rem' }}>
+                ¥{totalRaised.toLocaleString()}
+              </p>
               <p style={{ color:'#888', fontSize:'0.85rem', margin:'0 0 0.75rem' }}>目標 ¥{goalAmt.toLocaleString()}</p>
               <div style={{ background:'#e8f0f8', borderRadius:'4px', height:'8px', marginBottom:'0.75rem' }}>
                 <div style={{ background:'#2a7bd5', width:`${progress}%`, height:'100%', borderRadius:'4px' }} />
@@ -274,7 +298,9 @@ export default function ProjectPage() {
                   <p style={{ margin:'2px 0 0', color:'#888', fontSize:'0.8rem' }}>支援者</p>
                 </div>
                 <div style={{ textAlign:'center' }}>
-                  <p style={{ margin:0, fontWeight:700, fontSize:'1.3rem', color: daysLeft<=3 ? '#e55':'#333' }}>{daysLeft}</p>
+                  <p style={{ margin:0, fontWeight:700, fontSize:'1.3rem', color: (daysLeft??99)<=3 ? '#e55':'#333' }}>
+                    {daysLeft !== null ? daysLeft : '—'}
+                  </p>
                   <p style={{ margin:'2px 0 0', color:'#888', fontSize:'0.8rem' }}>残り日数</p>
                 </div>
               </div>
