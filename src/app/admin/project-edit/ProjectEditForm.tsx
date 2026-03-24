@@ -85,11 +85,11 @@ export default function ProjectEditForm() {
       const ext = file.name.split(".").pop() ?? "png";
       const path = `projects/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from("プロジェクト画像")
+        .from("images")
         .upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage
-        .from("プロジェクト画像")
+        .from("images")
         .getPublicUrl(path);
       const imgs = [...form.images];
       imgs[index] = publicUrl;
