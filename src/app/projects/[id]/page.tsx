@@ -82,11 +82,10 @@ export default function ProjectPage() {
     </div>
   );
 
-  const goalAmt   = project.goal ?? 1;
-  const progress  = Math.min(100, Math.round((totalRaised / goalAmt) * 100));
-  const daysLeft  = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000));
+  const goalAmt    = project.goal ?? 1;
+  const progress   = Math.min(100, Math.round((totalRaised / goalAmt) * 100));
+  const daysLeft   = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000));
   const validImages = (project.images ?? []).filter(url => url && url.trim() !== '');
-  /* story を --- で分割して最大3ブロック */
   const storyBlocks = (project.story ?? '').split('---').map(s => s.trim()).filter(s => s !== '');
   const projectUrl  = `https://cloudfan.vercel.app/projects/${project.id}`;
 
@@ -152,7 +151,7 @@ export default function ProjectPage() {
                 ))}
               </div>
 
-              {/* ── ストーリータブ：写真＋文章×3ブロック ── */}
+              {/* ── ストーリータブ ── */}
               {activeTab === 'story' && (
                 <div>
                   {/* YouTube */}
@@ -171,35 +170,29 @@ export default function ProjectPage() {
                     </div>
                   )}
 
-                  {/* 写真＋文章 交互ブロック */}
+                  {/* 写真左・文章右 統一ブロック */}
                   {storyBlocks.length > 0 ? (
-                    storyBlocks.map((block, i) => {
-                      const img    = validImages[i];
-                      const isOdd  = i % 2 !== 0; // 奇数ブロックは画像右
-                      return (
-                        <div key={i} style={{
-                          display:'flex', gap:'1.5rem', marginBottom:'2.5rem',
-                          flexDirection: isOdd ? 'row-reverse' : 'row',
-                          flexWrap:'wrap', alignItems:'center',
-                          background:'#fff', borderRadius:'16px', padding:'1.5rem',
-                          boxShadow:'0 2px 8px rgba(0,0,0,0.07)'
-                        }}>
-                          {/* 画像 */}
-                          {img && (
-                            <div style={{ flex:'0 0 42%', minWidth:'200px' }}>
-                              <img src={img} alt={`ストーリー画像${i+1}`}
-                                style={{ width:'100%', borderRadius:'10px', objectFit:'cover', aspectRatio:'4/3', display:'block' }} />
-                            </div>
-                          )}
-                          {/* テキスト */}
-                          <div style={{ flex:'1 1 45%' }}>
-                            <p style={{ color:'#333', lineHeight:1.9, whiteSpace:'pre-wrap', margin:0, fontSize:'0.97rem' }}>{block}</p>
+                    storyBlocks.map((block, i) => (
+                      <div key={i} style={{
+                        display:'flex', flexDirection:'row', gap:'1.5rem',
+                        marginBottom:'2rem', alignItems:'center',
+                        background:'#fff', borderRadius:'16px', padding:'1.5rem',
+                        boxShadow:'0 2px 8px rgba(0,0,0,0.07)'
+                      }}>
+                        {/* 写真：常に左 */}
+                        {validImages[i] && (
+                          <div style={{ flex:'0 0 42%', minWidth:'180px' }}>
+                            <img src={validImages[i]} alt={`ストーリー${i+1}`}
+                              style={{ width:'100%', borderRadius:'10px', objectFit:'cover', aspectRatio:'4/3', display:'block' }} />
                           </div>
+                        )}
+                        {/* テキスト：常に右 */}
+                        <div style={{ flex:'1 1 50%' }}>
+                          <p style={{ color:'#333', lineHeight:1.9, whiteSpace:'pre-wrap', margin:0, fontSize:'0.97rem' }}>{block}</p>
                         </div>
-                      );
-                    })
+                      </div>
+                    ))
                   ) : (
-                    /* --- が無い場合のフォールバック */
                     project.story && (
                       <div style={{ background:'#fff', borderRadius:'12px', padding:'1.5rem', boxShadow:'0 2px 6px rgba(0,0,0,0.06)' }}>
                         <p style={{ color:'#444', lineHeight:1.9, whiteSpace:'pre-wrap', margin:0 }}>{project.story}</p>
@@ -302,6 +295,7 @@ export default function ProjectPage() {
               </div>
             </div>
           </div>
+
         </div>
       </main>
 
