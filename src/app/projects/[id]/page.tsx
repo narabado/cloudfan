@@ -404,7 +404,7 @@ export default function ProjectDetail() {
                             <span>👥 {sCount}人が支援</span>
                             {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
                           </div>
-                          <button disabled={ended} style={{
+                          <button disabled={ended} onClick={() => { if (!ended) router.push(`/projects/${id}/support?tier=${tier.id}`); }} style={{
                             width: '100%', padding: 13,
                             background: ended ? '#94a3b8' : `linear-gradient(135deg, ${c}, ${c}dd)`,
                             color: '#fff', border: 'none', borderRadius: 10,
