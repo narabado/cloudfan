@@ -40,7 +40,7 @@ export default function TopPage() {
       const { data: pData } = await supabase
         .from('crowdfunding_projects')
         .select('*')
-        .eq('status', 'approved')
+        .in('status', ['approved', 'active', '募集中'])
         .order('created_at', { ascending: false });
       setProjects(pData ?? []);
 
