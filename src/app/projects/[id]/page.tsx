@@ -13,9 +13,7 @@ interface Tier {
   remaining: number | null;
 }
 
-// ✅ 修正①: interfaceをやめてanyにする（日本語カラム名はSupabase型パーサーがエラーを出すため）
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Supporter = any;
+type Supporter = Record<string, any>;
 
 interface Project {
   id: number;
@@ -44,19 +42,23 @@ function calcDaysLeft(deadline: string | null): { text: string; color: string } 
   const d = new Date(deadline);
   if (isNaN(d.getTime())) return { text: '期限未設定', color: '#94a3b8' };
   const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
-  if (diff < 0) return { text: '終了', color: '#ef4444' };
-  if (diff === 0) return { text: '本日終了', color: '#f97316' };
-  if (diff <= 7) return { text: `残り ${diff} 日`, color: '#f97316' };
-  return { text: `残り ${diff} 日`, color: '#059669' };
+  if (diff < 0)   return { text: '終了',           color: '#ef4444' };
+  if (diff === 0) return { text: '本日終了',        color: '#f97316' };
+  if (diff <= 7)  return { text: `残り ${diff} 日`, color: '#f97316' };
+  return                  { text: `残り ${diff} 日`, color: '#059669' };
 }
 
-function getStatusBadge(status: string): { label: string; bg: string; color: string } {
-  switch (status) {
-    case '募集中': return { label: '🟢 募集中', bg: '#dcfce7', color: '#166534' };
-    case '終了':   return { label: '🔴 終了',   bg: '#fee2e2', color: '#991b1b' };
-    case '達成':   return { label: '🏆 達成',   bg: '#fef9c3', color: '#854d0e' };
-    default:       return { label: status,      bg: '#f1f5f9', color: '#475569' };
-  }
+// ✅ active / closed など英語ステータスも日本語に変換
+function getStatusBadge(status: string) {
+  if (status === '募集中' || status === 'active')
+    return { label: '🟢 募集中', bg: '#dcfce7', color: '#166534' };
+  if (status === '終了' || status === 'closed' || status === 'inactive')
+    return { label: '🔴 終了',   bg: '#fee2e2', color: '#991b1b' };
+  if (status === '達成' || status === 'achieved')
+    return { label: '🏆 達成',   bg: '#fef9c3', color: '#854d0e' };
+  if (status === '準備中' || status === 'draft')
+    return { label: '⏳ 準備中', bg: '#f1f5f9', color: '#475569' };
+  return { label: status, bg: '#f1f5f9', color: '#475569' };
 }
 
 function getYouTubeId(url: string): string | null {
@@ -66,17 +68,16 @@ function getYouTubeId(url: string): string | null {
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject]         = useState<Project | null>(null);
-  const [tiers, setTiers]             = useState<Tier[]>([]);
-  // ✅ 修正②: Supporter[] → any[]
-  const [supporters, setSupporters]   = useState<any[]>([]);
-  const [totalRaised, setTotalRaised] = useState(0);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
-  const [activeTab, setActiveTab]     = useState<'story' | 'tiers' | 'supporters'>('story');
-  const [copied, setCopied]           = useState(false);
+  const [project,      setProject]      = useState<Project | null>(null);
+  const [tiers,        setTiers]        = useState<Tier[]>([]);
+  const [supporters,   setSupporters]   = useState<Supporter[]>([]);
+  const [totalRaised,  setTotalRaised]  = useState(0);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [activeTab,    setActiveTab]    = useState<'story' | 'tiers' | 'supporters'>('story');
+  const [copied,       setCopied]       = useState(false);
   const [tierComments, setTierComments] = useState<TierComment[]>([]);
-  const [newComment, setNewComment]     = useState<Record<string, string>>({});
+  const [newComment,   setNewComment]   = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -93,7 +94,7 @@ export default function ProjectDetail() {
         setLoading(false);
         return;
       }
-      setProject(proj as Project);
+      setProject(proj as unknown as Project);
 
       const { data: tierRows } = await supabase
         .from('project_tiers')
@@ -101,12 +102,11 @@ export default function ProjectDetail() {
         .eq('project_id', id)
         .order('amount', { ascending: true });
       if (tierRows && tierRows.length > 0) {
-        setTiers(tierRows as Tier[]);
+        setTiers(tierRows as unknown as Tier[]);
       } else if (Array.isArray(proj.tiers)) {
         setTiers(proj.tiers as Tier[]);
       }
 
-      // ✅ 修正③: select('*') に変更（日本語カラム名をselect文に書くとParserErrorになる）
       const { data: supRows, error: sErr } = await supabase
         .from('supporters')
         .select('*')
@@ -116,16 +116,11 @@ export default function ProjectDetail() {
       if (sErr) {
         console.error('supporters fetch error:', sErr.message);
       }
-
       if (supRows) {
-        // ✅ 修正④: as any[] でキャスト
-        const rows = supRows as any[];
+        const rows = supRows as unknown as Supporter[];
         setSupporters(rows);
-        // ✅ 修正⑤: r: any にしてtotal_amountを取得
         const total = rows.reduce(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (sum: number, r: any) => sum + (Number(r['total_amount']) || 0),
-          0
+          (sum: number, r: Supporter) => sum + (Number(r['total_amount']) || 0), 0
         );
         setTotalRaised(total);
       }
@@ -142,7 +137,6 @@ export default function ProjectDetail() {
       </div>
     </div>
   );
-
   if (error || !project) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: '#ef4444' }}>{error || 'エラーが発生しました'}</p>
@@ -150,11 +144,10 @@ export default function ProjectDetail() {
   );
 
   const imgs = Array.isArray(project.images)
-    ? project.images.filter((u): u is string => typeof u === 'string' && u.startsWith('http'))
+    ? (project.images as unknown[]).filter((u): u is string => typeof u === 'string' && u.startsWith('http'))
     : [];
   const heroImage   = imgs[0] || null;
   const storyImages = imgs.slice(1);
-
   const storyParts  = (project.story || '').split('---').map(s => s.trim()).filter(Boolean);
   const storyBlocks = [0, 1, 2].map(i => ({
     text:  storyParts[i]  || '',
@@ -168,22 +161,17 @@ export default function ProjectDetail() {
     ? Math.min(100, Math.round((totalRaised / project.goal) * 100))
     : 0;
 
-  // ✅ 修正⑥: s.ティア → s['ティア']（ブラケット記法）
-  const tierSupportCount: Record<string, number> = {};
+  const tierCount: Record<string, number> = {};
   for (const s of supporters) {
     const key = String(s['ティア'] || '');
-    if (key) tierSupportCount[key] = (tierSupportCount[key] || 0) + 1;
+    if (key) tierCount[key] = (tierCount[key] || 0) + 1;
   }
   const rankedTiers = [...tiers].sort((a, b) => {
-    const ca = tierSupportCount[a.name] || 0;
-    const cb = tierSupportCount[b.name] || 0;
+    const ca = tierCount[a.name] || 0;
+    const cb = tierCount[b.name] || 0;
     return cb !== ca ? cb - ca : b.amount - a.amount;
   });
-  const topCount = rankedTiers.length <= 3
-    ? rankedTiers.length
-    : Math.min(5, rankedTiers.length);
-  const topTiers = rankedTiers.slice(0, topCount);
-
+  const topTiers   = rankedTiers.slice(0, Math.min(5, rankedTiers.length));
   const tierColors = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
 
   const addComment = (tierId: string) => {
@@ -201,29 +189,24 @@ export default function ProjectDetail() {
   };
 
   const tabStyle = (tab: string): React.CSSProperties => ({
-    padding: '10px 24px',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 14,
-    fontWeight: 700,
-    borderRadius: '8px 8px 0 0',
+    padding: '10px 24px', border: 'none', cursor: 'pointer',
+    fontSize: 14, fontWeight: 700, borderRadius: '8px 8px 0 0',
     background: activeTab === tab ? '#1a2e4a' : '#f1f5f9',
-    color: activeTab === tab ? '#fff' : '#64748b',
+    color:      activeTab === tab ? '#fff'    : '#64748b',
     transition: 'all 0.2s',
   });
 
+  const isActive = project.status === '募集中' || project.status === 'active';
+
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@700&display=swap"
-        rel="stylesheet"
-      />
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@700&display=swap" rel="stylesheet" />
       <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: '#f8fafc', minHeight: '100vh' }}>
 
         {/* NavBar */}
         <nav style={{ background: '#1a2e4a', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-            <img src="/logo.png" alt="ならバド" style={{ height: 36 }}
+            <img src="/logo.png" alt="ロゴ" style={{ height: 36 }}
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 18 }}>CloudFan</span>
           </Link>
@@ -239,9 +222,8 @@ export default function ProjectDetail() {
             <img src={heroImage} alt="hero"
               style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
             <div style={{
-              position: 'absolute', top: 16, right: 16,
-              padding: '6px 16px', borderRadius: 20,
-              background: statusBadge.bg, color: statusBadge.color,
+              position: 'absolute', top: 16, right: 16, padding: '6px 16px',
+              borderRadius: 20, background: statusBadge.bg, color: statusBadge.color,
               fontWeight: 700, fontSize: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}>
               {statusBadge.label}
@@ -249,15 +231,12 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        <div style={{
-          maxWidth: 1100, margin: '0 auto', padding: '24px 16px',
-          display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32,
-        }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
 
-          {/* ── 左コンテンツ ── */}
+          {/* 左コンテンツ */}
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              {[project.school, project.club, project.region].filter(Boolean).map((t, i) => (
+              {([project.school, project.club, project.region] as string[]).filter(Boolean).map((t, i) => (
                 <span key={i} style={{ background: '#e8f4fd', color: '#1a56db', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{t}</span>
               ))}
               {!heroImage && (
@@ -301,21 +280,21 @@ export default function ProjectDetail() {
               </a>
             </div>
 
-            <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #1a2e4a', marginBottom: 0 }}>
+            {/* タブ */}
+            <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #1a2e4a' }}>
               {(['story', 'tiers', 'supporters'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} style={tabStyle(tab)}>
-                  {{ story: '📖 ストーリー', tiers: '🎁 支援プラン', supporters: '👥 支援者' }[tab]}
+                  {tab === 'story' ? '📖 ストーリー' : tab === 'tiers' ? '🎁 支援プラン' : '👥 支援者'}
                 </button>
               ))}
             </div>
 
             <div style={{ background: '#fff', padding: 24, borderRadius: '0 8px 8px 8px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', minHeight: 200 }}>
 
+              {/* ストーリー */}
               {activeTab === 'story' && (
                 <div>
-                  {storyBlocks.length === 0 && (
-                    <p style={{ color: '#94a3b8', textAlign: 'center' }}>ストーリーはまだ登録されていません。</p>
-                  )}
+                  {storyBlocks.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>ストーリーはまだ登録されていません。</p>}
                   {storyBlocks.map((block, i) => (
                     <div key={i} style={{ marginBottom: 40, paddingBottom: 32, borderBottom: i < storyBlocks.length - 1 ? '2px dashed #e2e8f0' : 'none' }}>
                       <h3 style={{ fontFamily: "'Noto Serif JP', serif", background: '#1a2e4a', color: '#fff', padding: '10px 18px', borderRadius: 8, marginBottom: 20, fontSize: 17 }}>
@@ -334,30 +313,27 @@ export default function ProjectDetail() {
                     <div style={{ marginTop: 24 }}>
                       <h3 style={{ color: '#1a2e4a', marginBottom: 12 }}>🎬 動画</h3>
                       <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
-                        <iframe
-                          src={`https://www.youtube.com/embed/${ytId}`}
+                        <iframe src={`https://www.youtube.com/embed/${ytId}`}
                           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 8 }}
-                          allowFullScreen
-                        />
+                          allowFullScreen />
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
+              {/* 支援プラン */}
               {activeTab === 'tiers' && (
                 <div>
                   <div style={{ marginBottom: 16, padding: '10px 16px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
                     <p style={{ margin: 0, color: '#1e40af', fontSize: 13, fontWeight: 700 }}>
-                      🏆 支援が集まりやすい上位{topCount}プランを表示しています
+                      🏆 支援が集まりやすい上位{topTiers.length}プランを表示しています
                     </p>
                   </div>
-                  {topTiers.length === 0 && (
-                    <p style={{ color: '#94a3b8', textAlign: 'center' }}>支援プランはまだ登録されていません。</p>
-                  )}
+                  {topTiers.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>支援プランはまだ登録されていません。</p>}
                   {topTiers.map((tier, i) => {
-                    const c = tierColors[i] || '#1a56db';
-                    const sCount = tierSupportCount[tier.name] || 0;
+                    const c        = tierColors[i] || '#1a56db';
+                    const sCount   = tierCount[tier.name] || 0;
                     const comments = tierComments.filter(t => t.tierId === tier.id);
                     return (
                       <div key={tier.id} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
@@ -376,10 +352,9 @@ export default function ProjectDetail() {
                             <span>👥 {sCount}人が支援</span>
                             {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
                           </div>
-                          <button
-                            disabled={project.status === '終了'}
-                            style={{ width: '100%', padding: '11px', background: project.status === '終了' ? '#94a3b8' : c, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: project.status === '終了' ? 'not-allowed' : 'pointer' }}>
-                            {project.status === '終了' ? '募集終了' : 'このプランで支援する'}
+                          <button disabled={!isActive}
+                            style={{ width: '100%', padding: 11, background: isActive ? c : '#94a3b8', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: isActive ? 'pointer' : 'not-allowed' }}>
+                            {isActive ? 'このプランで支援する' : '募集終了'}
                           </button>
                           <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8, fontWeight: 700 }}>💬 応援コメント ({comments.length})</p>
@@ -389,13 +364,11 @@ export default function ProjectDetail() {
                               </div>
                             ))}
                             <div style={{ display: 'flex', gap: 8 }}>
-                              <input
-                                value={newComment[tier.id] || ''}
+                              <input value={newComment[tier.id] || ''}
                                 onChange={e => setNewComment(p => ({ ...p, [tier.id]: e.target.value }))}
                                 onKeyDown={e => { if (e.key === 'Enter') addComment(tier.id); }}
                                 placeholder="応援メッセージを入力…"
-                                style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}
-                              />
+                                style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
                               <button onClick={() => addComment(tier.id)}
                                 style={{ padding: '8px 16px', background: c, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
                                 送信
@@ -409,27 +382,25 @@ export default function ProjectDetail() {
                 </div>
               )}
 
+              {/* 支援者 */}
               {activeTab === 'supporters' && (
                 <div>
-                  {supporters.length === 0 && (
-                    <p style={{ color: '#94a3b8', textAlign: 'center' }}>まだ支援者はいません。最初の支援者になりましょう！</p>
-                  )}
-                  {/* ✅ 修正⑦: s.名前 → s['名前'] などブラケット記法に統一 */}
+                  {supporters.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>まだ支援者はいません。最初の支援者になりましょう！</p>}
                   {supporters.map((s, idx) => (
-                    <div key={String(s['id'] ?? idx)} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
+                    <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
                       <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e8f4fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏸</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>
-                            {String(s['名前'] || '名前未設定')}
+                            {String(s['名前'] || s['name'] || '名前未設定')}
                           </span>
                           <span style={{ color: '#2563eb', fontWeight: 700, fontSize: 15 }}>
                             ¥{(Number(s['total_amount']) || 0).toLocaleString()}
                           </span>
                         </div>
-                        {s['メッセージ'] && (
+                        {(s['メッセージ'] || s['message']) && (
                           <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>
-                            {String(s['メッセージ'])}
+                            {String(s['メッセージ'] || s['message'])}
                           </p>
                         )}
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>
@@ -443,7 +414,7 @@ export default function ProjectDetail() {
             </div>
           </div>
 
-          {/* ── 右サイドバー ── */}
+          {/* 右サイドバー */}
           <div>
             <div style={{ background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', position: 'sticky', top: 24 }}>
               <div style={{ marginBottom: 16 }}>
@@ -480,15 +451,11 @@ export default function ProjectDetail() {
                 </span>
               </div>
 
-              <button
-                onClick={() => setActiveTab('tiers')}
-                disabled={project.status === '終了'}
-                style={{ width: '100%', padding: 14, marginBottom: 12, background: project.status === '終了' ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1a2e4a)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 16, cursor: project.status === '終了' ? 'not-allowed' : 'pointer' }}>
-                {project.status === '終了' ? '募集終了' : '🏸 支援する'}
+              <button onClick={() => setActiveTab('tiers')} disabled={!isActive}
+                style={{ width: '100%', padding: 14, marginBottom: 12, background: isActive ? 'linear-gradient(135deg, #2563eb, #1a2e4a)' : '#94a3b8', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 16, cursor: isActive ? 'pointer' : 'not-allowed' }}>
+                {isActive ? '🏸 支援する' : '募集終了'}
               </button>
-
-              <button
-                onClick={() => setActiveTab('tiers')}
+              <button onClick={() => setActiveTab('tiers')}
                 style={{ width: '100%', padding: 10, background: '#f8fafc', color: '#2563eb', border: '2px solid #2563eb', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 支援プランを見る
               </button>
@@ -502,14 +469,10 @@ export default function ProjectDetail() {
                   </button>
                   <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(project.title)}`}
                     target="_blank" rel="noreferrer"
-                    style={{ padding: '6px 14px', background: '#000', color: '#fff', borderRadius: 6, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>
-                    𝕏
-                  </a>
+                    style={{ padding: '6px 14px', background: '#000', color: '#fff', borderRadius: 6, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>𝕏</a>
                   <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
                     target="_blank" rel="noreferrer"
-                    style={{ padding: '6px 14px', background: '#00b900', color: '#fff', borderRadius: 6, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>
-                    LINE
-                  </a>
+                    style={{ padding: '6px 14px', background: '#00b900', color: '#fff', borderRadius: 6, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>LINE</a>
                 </div>
               </div>
             </div>
