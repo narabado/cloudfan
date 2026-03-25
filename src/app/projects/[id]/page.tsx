@@ -13,18 +13,9 @@ interface Tier {
   remaining: number | null;
 }
 
-// supporters テーブルの実際のカラム名（日本語）に合わせた型
-interface Supporter {
-  id: string;
-  名前: string | null;
-  ステータス: string;
-  total_amount: number;
-  メッセージ: string | null;
-  タイムスタンプ: string | null;
-  created_at: string | null;
-  project_id: number;
-  ティア: string | null;
-}
+// ✅ 修正①: interfaceをやめてanyにする（日本語カラム名はSupabase型パーサーがエラーを出すため）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Supporter = any;
 
 interface Project {
   id: number;
@@ -75,14 +66,15 @@ function getYouTubeId(url: string): string | null {
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject]     = useState<Project | null>(null);
-  const [tiers, setTiers]         = useState<Tier[]>([]);
-  const [supporters, setSupporters] = useState<Supporter[]>([]);
+  const [project, setProject]         = useState<Project | null>(null);
+  const [tiers, setTiers]             = useState<Tier[]>([]);
+  // ✅ 修正②: Supporter[] → any[]
+  const [supporters, setSupporters]   = useState<any[]>([]);
   const [totalRaised, setTotalRaised] = useState(0);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState('');
-  const [activeTab, setActiveTab] = useState<'story' | 'tiers' | 'supporters'>('story');
-  const [copied, setCopied]       = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState('');
+  const [activeTab, setActiveTab]     = useState<'story' | 'tiers' | 'supporters'>('story');
+  const [copied, setCopied]           = useState(false);
   const [tierComments, setTierComments] = useState<TierComment[]>([]);
   const [newComment, setNewComment]     = useState<Record<string, string>>({});
 
@@ -91,7 +83,6 @@ export default function ProjectDetail() {
     (async () => {
       setLoading(true);
 
-      // プロジェクト取得
       const { data: proj, error: pErr } = await supabase
         .from('crowdfunding_projects')
         .select('*')
@@ -104,7 +95,6 @@ export default function ProjectDetail() {
       }
       setProject(proj as Project);
 
-      // ティア取得
       const { data: tierRows } = await supabase
         .from('project_tiers')
         .select('*')
@@ -116,10 +106,10 @@ export default function ProjectDetail() {
         setTiers(proj.tiers as Tier[]);
       }
 
-      // 支援者取得（実際のカラム名で取得）
+      // ✅ 修正③: select('*') に変更（日本語カラム名をselect文に書くとParserErrorになる）
       const { data: supRows, error: sErr } = await supabase
         .from('supporters')
-        .select('id, 名前, ステータス, total_amount, メッセージ, created_at, タイムスタンプ, project_id, ティア')
+        .select('*')
         .eq('project_id', Number(id))
         .order('created_at', { ascending: false });
 
@@ -128,9 +118,13 @@ export default function ProjectDetail() {
       }
 
       if (supRows) {
-        setSupporters(supRows as Supporter[]);
-        const total = supRows.reduce(
-          (sum: number, r: { total_amount: unknown }) => sum + (Number(r.total_amount) || 0),
+        // ✅ 修正④: as any[] でキャスト
+        const rows = supRows as any[];
+        setSupporters(rows);
+        // ✅ 修正⑤: r: any にしてtotal_amountを取得
+        const total = rows.reduce(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (sum: number, r: any) => sum + (Number(r['total_amount']) || 0),
           0
         );
         setTotalRaised(total);
@@ -167,17 +161,17 @@ export default function ProjectDetail() {
     image: storyImages[i] || '',
   })).filter(b => b.text || b.image);
 
-  const ytId       = project.youtube_url ? getYouTubeId(project.youtube_url) : null;
-  const days       = calcDaysLeft(project.deadline);
+  const ytId        = project.youtube_url ? getYouTubeId(project.youtube_url) : null;
+  const days        = calcDaysLeft(project.deadline);
   const statusBadge = getStatusBadge(project.status);
   const progressPct = project.goal > 0
     ? Math.min(100, Math.round((totalRaised / project.goal) * 100))
     : 0;
 
-  // 上位ティア（支援者の「ティア」列でカウント → 金額順）
+  // ✅ 修正⑥: s.ティア → s['ティア']（ブラケット記法）
   const tierSupportCount: Record<string, number> = {};
   for (const s of supporters) {
-    const key = s.ティア || '';
+    const key = String(s['ティア'] || '');
     if (key) tierSupportCount[key] = (tierSupportCount[key] || 0) + 1;
   }
   const rankedTiers = [...tiers].sort((a, b) => {
@@ -262,7 +256,6 @@ export default function ProjectDetail() {
 
           {/* ── 左コンテンツ ── */}
           <div>
-            {/* タグ + ステータス */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {[project.school, project.club, project.region].filter(Boolean).map((t, i) => (
                 <span key={i} style={{ background: '#e8f4fd', color: '#1a56db', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{t}</span>
@@ -281,7 +274,6 @@ export default function ProjectDetail() {
               {project.description}
             </p>
 
-            {/* 締切日 */}
             {project.deadline && (
               <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <span>📅</span>
@@ -292,7 +284,6 @@ export default function ProjectDetail() {
               </div>
             )}
 
-            {/* SNSシェア */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
               <button onClick={copyUrl}
                 style={{ padding: '6px 16px', background: copied ? '#059669' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
@@ -310,7 +301,6 @@ export default function ProjectDetail() {
               </a>
             </div>
 
-            {/* タブ */}
             <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #1a2e4a', marginBottom: 0 }}>
               {(['story', 'tiers', 'supporters'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} style={tabStyle(tab)}>
@@ -321,7 +311,6 @@ export default function ProjectDetail() {
 
             <div style={{ background: '#fff', padding: 24, borderRadius: '0 8px 8px 8px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', minHeight: 200 }}>
 
-              {/* ── ストーリー ── */}
               {activeTab === 'story' && (
                 <div>
                   {storyBlocks.length === 0 && (
@@ -356,7 +345,6 @@ export default function ProjectDetail() {
                 </div>
               )}
 
-              {/* ── 支援プラン（上位ティア） ── */}
               {activeTab === 'tiers' && (
                 <div>
                   <div style={{ marginBottom: 16, padding: '10px 16px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
@@ -393,8 +381,6 @@ export default function ProjectDetail() {
                             style={{ width: '100%', padding: '11px', background: project.status === '終了' ? '#94a3b8' : c, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: project.status === '終了' ? 'not-allowed' : 'pointer' }}>
                             {project.status === '終了' ? '募集終了' : 'このプランで支援する'}
                           </button>
-
-                          {/* コメント */}
                           <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8, fontWeight: 700 }}>💬 応援コメント ({comments.length})</p>
                             {comments.map((cm, ci) => (
@@ -423,29 +409,31 @@ export default function ProjectDetail() {
                 </div>
               )}
 
-              {/* ── 支援者 ── */}
               {activeTab === 'supporters' && (
                 <div>
                   {supporters.length === 0 && (
                     <p style={{ color: '#94a3b8', textAlign: 'center' }}>まだ支援者はいません。最初の支援者になりましょう！</p>
                   )}
-                  {supporters.map(s => (
-                    <div key={s.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
+                  {/* ✅ 修正⑦: s.名前 → s['名前'] などブラケット記法に統一 */}
+                  {supporters.map((s, idx) => (
+                    <div key={String(s['id'] ?? idx)} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
                       <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e8f4fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏸</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>
-                            {s.名前 || '名前未設定'}
+                            {String(s['名前'] || '名前未設定')}
                           </span>
                           <span style={{ color: '#2563eb', fontWeight: 700, fontSize: 15 }}>
-                            ¥{(Number(s.total_amount) || 0).toLocaleString()}
+                            ¥{(Number(s['total_amount']) || 0).toLocaleString()}
                           </span>
                         </div>
-                        {s.メッセージ && (
-                          <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>{s.メッセージ}</p>
+                        {s['メッセージ'] && (
+                          <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>
+                            {String(s['メッセージ'])}
+                          </p>
                         )}
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>
-                          {s.created_at ? new Date(s.created_at).toLocaleDateString('ja-JP') : ''}
+                          {s['created_at'] ? new Date(String(s['created_at'])).toLocaleDateString('ja-JP') : ''}
                         </span>
                       </div>
                     </div>
