@@ -1,477 +1,503 @@
 'use client';
-
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
+// ── 型定義 ──────────────────────────────────────────────────
 interface Tier {
-  id: number;
+  id: string;
   name: string;
   amount: number;
   description: string;
-  max_supporters?: number;
-  current_supporters?: number;
-  icon?: string;
+  limit: number | null;
+  remaining: number | null;
 }
 
-interface Supporter {
-  id: number;
-  name: string;
-  amount: number;
-  message?: string;
-  created_at: string;
-  is_anonymous?: boolean;
-}
+// Supabaseのカラム名が日本語のため any で受けて後でアクセス
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Supporter = Record<string, any>;
 
 interface Project {
   id: number;
   title: string;
+  school: string;
+  club: string;
+  region: string;
   description: string;
-  story?: string;
+  story: string | null;
   goal: number;
-  deadline?: string;
-  images?: string[];
-  youtube_url?: string;
-  category?: string;
-  tiers?: any[];
+  deadline: string | null;
+  images: string[];
+  youtube_url: string | null;
+  tiers: Tier[] | null;
+  status: string;
 }
 
-const TIER_COLORS: Record<string, { bg: string; border: string; text: string; icon: string }> = {
-  'ブロンズ':   { bg: '#fef3c7', border: '#d97706', text: '#92400e', icon: '🥉' },
-  'シルバー':   { bg: '#f3f4f6', border: '#9ca3af', text: '#374151', icon: '🥈' },
-  'ゴールド':   { bg: '#fffbeb', border: '#f59e0b', text: '#78350f', icon: '🥇' },
-  'プラチナ':   { bg: '#eff6ff', border: '#3b82f6', text: '#1e3a5f', icon: '💎' },
-  'レジェンド': { bg: '#f5f3ff', border: '#7c3aed', text: '#4c1d95', icon: '👑' },
-};
+interface TierComment {
+  tierId: string;
+  name: string;
+  comment: string;
+}
 
-function getTierColor(name: string) {
-  const key = Object.keys(TIER_COLORS).find(k => name.includes(k));
-  return key ? TIER_COLORS[key] : { bg: '#f9fafb', border: '#e5e7eb', text: '#1f2937', icon: '🎁' };
+// ── ユーティリティ ───────────────────────────────────────────
+function calcDaysLeft(deadline: string | null): { text: string; color: string } {
+  if (!deadline || deadline.trim() === '') return { text: '期限未設定', color: '#94a3b8' };
+  const d = new Date(deadline);
+  if (isNaN(d.getTime())) return { text: '期限未設定', color: '#94a3b8' };
+  const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
+  if (diff < 0)  return { text: '終了',          color: '#ef4444' };
+  if (diff === 0) return { text: '本日終了',      color: '#f97316' };
+  if (diff <= 7) return { text: `残り ${diff} 日`, color: '#f97316' };
+  return                  { text: `残り ${diff} 日`, color: '#059669' };
+}
+
+function getStatusBadge(status: string) {
+  if (status === '募集中') return { label: '🟢 募集中', bg: '#dcfce7', color: '#166534' };
+  if (status === '終了')   return { label: '🔴 終了',   bg: '#fee2e2', color: '#991b1b' };
+  if (status === '達成')   return { label: '🏆 達成',   bg: '#fef9c3', color: '#854d0e' };
+  return                           { label: status,      bg: '#f1f5f9', color: '#475569' };
 }
 
 function getYouTubeId(url: string): string | null {
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([^&?/]+)/);
+  const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
-function calcDaysLeft(deadline?: string): number | null {
-  if (!deadline) return null;
-  const d = new Date(deadline);
-  if (isNaN(d.getTime())) return null;
-  return Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86400000));
-}
-
-export default function ProjectDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const projectId = String(params?.id ?? '');
-
-  const [project, setProject] = useState<Project | null>(null);
-  const [tiers, setTiers] = useState<Tier[]>([]);
-  const [supporters, setSupporters] = useState<Supporter[]>([]);
-  const [totalRaised, setTotalRaised] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'story' | 'supporters'>('story');
-  const [copied, setCopied] = useState(false);
+// ── メインコンポーネント ──────────────────────────────────────
+export default function ProjectDetail() {
+  const { id } = useParams<{ id: string }>();
+  const [project,      setProject]      = useState<Project | null>(null);
+  const [tiers,        setTiers]        = useState<Tier[]>([]);
+  const [supporters,   setSupporters]   = useState<Supporter[]>([]);
+  const [totalRaised,  setTotalRaised]  = useState(0);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [activeTab,    setActiveTab]    = useState<'story' | 'tiers' | 'supporters'>('story');
+  const [copied,       setCopied]       = useState(false);
+  const [tierComments, setTierComments] = useState<TierComment[]>([]);
+  const [newComment,   setNewComment]   = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!id) return;
     (async () => {
       setLoading(true);
-      try {
-        const { data: proj, error: pe } = await supabase
-          .from('crowdfunding_projects')
-          .select('*')
-          .eq('id', projectId)
-          .single();
-        if (pe || !proj) throw new Error('プロジェクトが見つかりません');
-        setProject(proj);
 
-        const { data: tierRows } = await supabase
-          .from('project_tiers')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('amount', { ascending: true });
-
-        if (tierRows && tierRows.length > 0) {
-          setTiers(tierRows);
-        } else if (Array.isArray(proj.tiers) && proj.tiers.length > 0) {
-          setTiers(
-            proj.tiers.map((t: any, i: number) => ({
-              id: i + 1,
-              name: t.name ?? ('ティア' + (i + 1)),
-              amount: t.amount ?? 0,
-              description: t.description ?? '',
-              max_supporters: t.max_supporters,
-              current_supporters: t.current_supporters ?? 0,
-              icon: t.icon,
-            }))
-          );
-        }
-
-        const { data: supRows } = await supabase
-          .from('supporters')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: false });
-
-        if (supRows) {
-          setSupporters(supRows);
-          const total = supRows.reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0);
-          setTotalRaised(total);
-        }
-      } catch (e: any) {
-        setError(e.message ?? 'エラーが発生しました');
-      } finally {
+      // プロジェクト取得
+      const { data: proj, error: pErr } = await supabase
+        .from('crowdfunding_projects')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (pErr || !proj) {
+        setError('プロジェクトが見つかりません');
         setLoading(false);
+        return;
       }
+      setProject(proj as unknown as Project);
+
+      // ティア取得
+      const { data: tierRows } = await supabase
+        .from('project_tiers')
+        .select('*')
+        .eq('project_id', id)
+        .order('amount', { ascending: true });
+      if (tierRows && tierRows.length > 0) {
+        setTiers(tierRows as unknown as Tier[]);
+      } else if (Array.isArray(proj.tiers)) {
+        setTiers(proj.tiers as Tier[]);
+      }
+
+      // ✅ 支援者取得：select('*') で日本語カラム名のパースエラーを回避
+      const { data: supRows, error: sErr } = await supabase
+        .from('supporters')
+        .select('*')
+        .eq('project_id', Number(id))
+        .order('created_at', { ascending: false });
+
+      if (sErr) {
+        console.error('supporters fetch error:', sErr.message);
+      }
+      if (supRows) {
+        // ✅ as unknown as Supporter[] でTypeScript型エラーを回避
+        const rows = supRows as unknown as Supporter[];
+        setSupporters(rows);
+        // ✅ total_amount カラムで集計（amount ではない）
+        const total = rows.reduce(
+          (sum: number, r: Supporter) => sum + (Number(r['total_amount']) || 0),
+          0
+        );
+        setTotalRaised(total);
+      }
+
+      setLoading(false);
     })();
-  }, [projectId]);
+  }, [id]);
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f4f8' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🏸</div>
-          <p style={{ color: '#1e3a5f', fontWeight: 700, fontSize: '1.1rem' }}>読み込み中...</p>
-        </div>
+  // ── ローディング / エラー ────────────────────────────────────
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🏸</div>
+        <p style={{ color: '#1a2e4a', fontWeight: 700 }}>読み込み中…</p>
       </div>
-    );
+    </div>
+  );
+  if (error || !project) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#ef4444' }}>{error || 'エラーが発生しました'}</p>
+    </div>
+  );
+
+  // ── データ整形 ───────────────────────────────────────────────
+  const imgs = Array.isArray(project.images)
+    ? (project.images as unknown[]).filter((u): u is string => typeof u === 'string' && u.startsWith('http'))
+    : [];
+  const heroImage   = imgs[0] || null;
+  const storyImages = imgs.slice(1);
+
+  const storyParts  = (project.story || '').split('---').map(s => s.trim()).filter(Boolean);
+  const storyBlocks = [0, 1, 2].map(i => ({
+    text:  storyParts[i]  || '',
+    image: storyImages[i] || '',
+  })).filter(b => b.text || b.image);
+
+  const ytId        = project.youtube_url ? getYouTubeId(project.youtube_url) : null;
+  const days        = calcDaysLeft(project.deadline);
+  const statusBadge = getStatusBadge(project.status);
+  const progressPct = project.goal > 0
+    ? Math.min(100, Math.round((totalRaised / project.goal) * 100))
+    : 0;
+
+  // 上位ティア（支援者の「ティア」列でカウント）
+  const tierCount: Record<string, number> = {};
+  for (const s of supporters) {
+    const key = String(s['ティア'] || '');
+    if (key) tierCount[key] = (tierCount[key] || 0) + 1;
   }
+  const rankedTiers = [...tiers].sort((a, b) => {
+    const ca = tierCount[a.name] || 0;
+    const cb = tierCount[b.name] || 0;
+    return cb !== ca ? cb - ca : b.amount - a.amount;
+  });
+  const topTiers    = rankedTiers.slice(0, Math.min(5, rankedTiers.length));
+  const tierColors  = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
 
-  if (error || !project) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ color: '#dc2626', marginBottom: '1rem' }}>{error || 'プロジェクトが見つかりません'}</p>
-          <Link href="/" style={{ color: '#2563eb' }}>← トップへ戻る</Link>
-        </div>
-      </div>
-    );
-  }
+  const addComment = (tierId: string) => {
+    const text = (newComment[tierId] || '').trim();
+    if (!text) return;
+    setTierComments(prev => [{ tierId, name: '匿名', comment: text }, ...prev]);
+    setNewComment(prev => ({ ...prev, [tierId]: '' }));
+  };
 
-  const validImages = (project.images ?? []).filter((u: string) => u && u.trim() !== '');
-  const heroImage = validImages[0] ?? null;
-  const storyBlocks = (project.story ?? '').split('---').map((s: string) => s.trim()).filter(Boolean);
-  const progressPct = project.goal > 0 ? Math.min(100, Math.round((totalRaised / project.goal) * 100)) : 0;
-  const daysLeft = calcDaysLeft(project.deadline);
-  const projectUrl = 'https://cloudfan.vercel.app/projects/' + project.id;
-  const ytId = project.youtube_url ? getYouTubeId(project.youtube_url) : null;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(projectUrl).then(() => {
+  const copyUrl = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
+  const tabStyle = (tab: string): React.CSSProperties => ({
+    padding: '10px 24px', border: 'none', cursor: 'pointer',
+    fontSize: 14, fontWeight: 700, borderRadius: '8px 8px 0 0',
+    background: activeTab === tab ? '#1a2e4a' : '#f1f5f9',
+    color:      activeTab === tab ? '#fff'    : '#64748b',
+    transition: 'all 0.2s',
+  });
+
+  // ── JSX ──────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: '#f0f4f8', minHeight: '100vh' }}>
-
+    <>
       <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@700&display=swap"
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&display=swap"
       />
+      <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: '#f8fafc', minHeight: '100vh' }}>
 
-      {/* HEADER */}
-      <header style={{
-        background: 'linear-gradient(135deg, #0f2d5a 0%, #1e3a5f 60%, #0e4d2f 100%)',
-        padding: '0.75rem 1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <img
-            src="/logo.png"
-            alt="logo"
-            style={{ height: '36px', objectFit: 'contain' }}
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
-          <Link href="/" style={{ color: '#fff', fontSize: '1.1rem', fontWeight: 700, textDecoration: 'none' }}>
-            🏸 CLOUDFAN
+        {/* NavBar */}
+        <nav style={{ background: '#1a2e4a', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+            <img src="/logo.png" alt="ならバド" style={{ height: 36 }}
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 18 }}>CloudFan</span>
           </Link>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <Link href="/" style={{ color: '#e2e8f0', fontSize: '0.85rem', padding: '0.4rem 0.9rem', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '20px', textDecoration: 'none' }}>
-            ← トップ
-          </Link>
-          <Link href={'/projects/' + projectId + '/edit'} style={{ color: '#e2e8f0', fontSize: '0.85rem', padding: '0.4rem 0.9rem', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '20px', textDecoration: 'none' }}>
-            ✏️ 編集
-          </Link>
-        </div>
-      </header>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/projects" style={{ color: 'rgba(255,255,255,0.85)', padding: '8px 16px', fontSize: 14, textDecoration: 'none' }}>支援する</Link>
+            <Link href="/admin"    style={{ color: 'rgba(255,255,255,0.85)', padding: '8px 16px', fontSize: 13, textDecoration: 'none' }}>管理</Link>
+          </div>
+        </nav>
 
-      {/* MAIN */}
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1rem' }}>
-
-        <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f2d5a', marginBottom: '0.5rem', lineHeight: 1.4, fontFamily: "'Noto Serif JP', serif" }}>
-          {project.title}
-        </h1>
-        {project.category && (
-          <span style={{ display: 'inline-block', background: '#dbeafe', color: '#1d4ed8', fontSize: '0.78rem', padding: '0.2rem 0.7rem', borderRadius: '20px', marginBottom: '1rem', fontWeight: 600 }}>
-            {project.category}
-          </span>
+        {/* ヒーロー画像 */}
+        {heroImage && (
+          <div style={{ width: '100%', height: 360, overflow: 'hidden', position: 'relative' }}>
+            <img src={heroImage} alt="hero"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+            <div style={{
+              position: 'absolute', top: 16, right: 16, padding: '6px 16px',
+              borderRadius: 20, background: statusBadge.bg, color: statusBadge.color,
+              fontWeight: 700, fontSize: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}>
+              {statusBadge.label}
+            </div>
+          </div>
         )}
 
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
 
-          {/* LEFT */}
-          <div style={{ flex: '1 1 600px', minWidth: 0 }}>
+          {/* ── 左コンテンツ ── */}
+          <div>
+            {/* タグ */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              {([project.school, project.club, project.region] as string[]).filter(Boolean).map((t, i) => (
+                <span key={i} style={{ background: '#e8f4fd', color: '#1a56db', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{t}</span>
+              ))}
+              {!heroImage && (
+                <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>
+                  {statusBadge.label}
+                </span>
+              )}
+            </div>
 
-            {heroImage && (
-              <div style={{ marginBottom: '1.5rem', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
-                <img src={heroImage} alt={project.title} style={{ width: '100%', maxHeight: '420px', objectFit: 'cover', display: 'block' }} />
-              </div>
-            )}
-
-            <p style={{ fontSize: '1rem', color: '#374151', lineHeight: 1.8, marginBottom: '1.5rem', background: '#fff', padding: '1.2rem', borderRadius: '10px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+            <h1 style={{ fontFamily: "'Noto Serif JP', serif", fontSize: 26, color: '#0f172a', marginBottom: 12, lineHeight: 1.5 }}>
+              {project.title}
+            </h1>
+            <p style={{ color: '#475569', fontSize: 15, lineHeight: 1.9, marginBottom: 20 }}>
               {project.description}
             </p>
 
-            {/* TABS */}
-            <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '1.5rem', gap: '0.5rem' }}>
-              <button
-                onClick={() => setActiveTab('story')}
-                style={{ padding: '0.6rem 1.4rem', border: 'none', borderBottom: activeTab === 'story' ? '3px solid #1d4ed8' : '3px solid transparent', marginBottom: '-2px', background: 'none', fontWeight: activeTab === 'story' ? 700 : 400, color: activeTab === 'story' ? '#1d4ed8' : '#6b7280', fontSize: '0.95rem', cursor: 'pointer' }}
-              >
-                📖 ストーリー
+            {/* 締切日 */}
+            {project.deadline && (
+              <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span>📅</span>
+                <span style={{ color: '#166534', fontSize: 14, fontWeight: 700 }}>
+                  締切: {new Date(project.deadline).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </span>
+                <span style={{ color: days.color, fontWeight: 700, fontSize: 14 }}>（{days.text}）</span>
+              </div>
+            )}
+
+            {/* SNSシェア */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+              <button onClick={copyUrl}
+                style={{ padding: '6px 16px', background: copied ? '#059669' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                {copied ? '✅ コピー済み' : '🔗 URLをコピー'}
               </button>
-              <button
-                onClick={() => setActiveTab('supporters')}
-                style={{ padding: '0.6rem 1.4rem', border: 'none', borderBottom: activeTab === 'supporters' ? '3px solid #1d4ed8' : '3px solid transparent', marginBottom: '-2px', background: 'none', fontWeight: activeTab === 'supporters' ? 700 : 400, color: activeTab === 'supporters' ? '#1d4ed8' : '#6b7280', fontSize: '0.95rem', cursor: 'pointer' }}
-              >
-                {'👥 支援者 (' + supporters.length + ')'}
-              </button>
+              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(project.title)}&url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+                target="_blank" rel="noreferrer"
+                style={{ padding: '6px 16px', background: '#000', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none' }}>
+                𝕏 シェア
+              </a>
+              <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+                target="_blank" rel="noreferrer"
+                style={{ padding: '6px 16px', background: '#00b900', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none' }}>
+                LINE
+              </a>
             </div>
 
-            {/* STORY TAB */}
-            {activeTab === 'story' && (
-              <div>
-                {ytId && (
-                  <div style={{ marginBottom: '2rem', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.1)' }}>
-                    <iframe
-                      width="100%"
-                      height="360"
-                      src={'https://www.youtube.com/embed/' + ytId}
-                      frameBorder="0"
-                      allowFullScreen
-                      style={{ display: 'block' }}
-                    />
-                  </div>
-                )}
+            {/* タブ */}
+            <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #1a2e4a' }}>
+              {(['story', 'tiers', 'supporters'] as const).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={tabStyle(tab)}>
+                  {tab === 'story' ? '📖 ストーリー' : tab === 'tiers' ? '🎁 支援プラン' : '👥 支援者'}
+                </button>
+              ))}
+            </div>
 
-                {storyBlocks.length > 0 ? (
-                  storyBlocks.map((block, i) => {
-                    const img = validImages[i] ?? null;
-                    return (
-                      <div key={i} style={{ display: 'flex', gap: '1.5rem', marginBottom: '2.5rem', background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', alignItems: 'stretch' }}>
-                        {img && (
-                          <div style={{ flex: '0 0 280px', maxWidth: '280px' }}>
-                            <img src={img} alt={'story-' + i} style={{ width: '100%', height: '100%', minHeight: '200px', objectFit: 'cover', display: 'block' }} />
-                          </div>
-                        )}
-                        <div style={{ flex: 1, padding: '1.5rem', display: 'flex', alignItems: 'center' }}>
-                          <p style={{ fontSize: '1rem', lineHeight: 1.9, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>{block}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div style={{ background: '#fff', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-                    <p style={{ lineHeight: 1.9, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>{project.story}</p>
-                  </div>
-                )}
-              </div>
-            )}
+            <div style={{ background: '#fff', padding: 24, borderRadius: '0 8px 8px 8px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', minHeight: 200 }}>
 
-            {/* SUPPORTERS TAB */}
-            {activeTab === 'supporters' && (
-              <div>
-                {supporters.length === 0 ? (
-                  <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                    まだ支援者はいません。最初の支援者になりましょう！
-                  </div>
-                ) : (
-                  supporters.map(s => (
-                    <div key={s.id} style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', marginBottom: '1rem', display: 'flex', gap: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #1e3a5f, #0e4d2f)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, flexShrink: 0 }}>
-                        {s.is_anonymous ? '?' : (s.name ? s.name[0] : '?')}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                          <span style={{ fontWeight: 600 }}>{s.is_anonymous ? '匿名' : s.name}</span>
-                          <span style={{ color: '#1d4ed8', fontWeight: 700 }}>{'¥' + s.amount.toLocaleString()}</span>
-                        </div>
-                        {s.message && (
-                          <p style={{ fontSize: '0.9rem', color: '#6b7280', lineHeight: 1.6, margin: 0 }}>{s.message}</p>
+              {/* ── ストーリー ── */}
+              {activeTab === 'story' && (
+                <div>
+                  {storyBlocks.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>ストーリーはまだ登録されていません。</p>}
+                  {storyBlocks.map((block, i) => (
+                    <div key={i} style={{ marginBottom: 40, paddingBottom: 32, borderBottom: i < storyBlocks.length - 1 ? '2px dashed #e2e8f0' : 'none' }}>
+                      <h3 style={{ fontFamily: "'Noto Serif JP', serif", background: '#1a2e4a', color: '#fff', padding: '10px 18px', borderRadius: 8, marginBottom: 20, fontSize: 17 }}>
+                        {['第1章', '第2章', '第3章'][i] || `第${i + 1}章`}
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: block.image ? '1fr 1fr' : '1fr', gap: 20, alignItems: 'start' }}>
+                        <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap' }}>{block.text}</p>
+                        {block.image && (
+                          <img src={block.image} alt={`story-${i}`}
+                            style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }} />
                         )}
-                        <p style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '0.3rem', marginBottom: 0 }}>
-                          {new Date(s.created_at).toLocaleDateString('ja-JP')}
-                        </p>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            )}
+                  ))}
+                  {ytId && (
+                    <div style={{ marginTop: 24 }}>
+                      <h3 style={{ color: '#1a2e4a', marginBottom: 12 }}>🎬 動画</h3>
+                      <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                        <iframe src={`https://www.youtube.com/embed/${ytId}`}
+                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 8 }}
+                          allowFullScreen />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* TIERS */}
-            <div style={{ marginTop: '2.5rem' }}>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#0f2d5a', marginBottom: '1.2rem', paddingBottom: '0.5rem', borderBottom: '2px solid #dbeafe', fontFamily: "'Noto Serif JP', serif" }}>
-                🎁 支援ティア・特典
-              </h2>
-              {tiers.length === 0 ? (
-                <p style={{ color: '#9ca3af', textAlign: 'center', padding: '2rem' }}>ティア情報が設定されていません</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-                  {tiers.map(tier => {
-                    const tc = getTierColor(tier.name);
-                    const remaining = tier.max_supporters != null
-                      ? tier.max_supporters - (tier.current_supporters ?? 0)
-                      : null;
+              {/* ── 支援プラン ── */}
+              {activeTab === 'tiers' && (
+                <div>
+                  <div style={{ marginBottom: 16, padding: '10px 16px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                    <p style={{ margin: 0, color: '#1e40af', fontSize: 13, fontWeight: 700 }}>
+                      🏆 支援が集まりやすい上位{topTiers.length}プランを表示しています
+                    </p>
+                  </div>
+                  {topTiers.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>支援プランはまだ登録されていません。</p>}
+                  {topTiers.map((tier, i) => {
+                    const c        = tierColors[i] || '#1a56db';
+                    const sCount   = tierCount[tier.name] || 0;
+                    const comments = tierComments.filter(t => t.tierId === tier.id);
                     return (
-                      <div key={tier.id} style={{ background: tc.bg, border: '2px solid ' + tc.border, borderRadius: '12px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '1.5rem' }}>{tier.icon ?? tc.icon}</span>
-                          <span style={{ fontWeight: 700, color: tc.text, fontSize: '1rem' }}>{tier.name}</span>
+                      <div key={tier.id} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                        <div style={{ background: c, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>
+                              {i + 1}
+                            </span>
+                            <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>{tier.name}</span>
+                          </div>
+                          <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>¥{tier.amount.toLocaleString()}</span>
                         </div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: tc.text }}>
-                          {'¥' + tier.amount.toLocaleString()}
+                        <div style={{ padding: '16px 18px', background: '#fff' }}>
+                          <p style={{ color: '#334155', fontSize: 14, lineHeight: 1.8, marginBottom: 12 }}>{tier.description}</p>
+                          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+                            <span>👥 {sCount}人が支援</span>
+                            {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
+                          </div>
+                          <button
+                            disabled={project.status === '終了'}
+                            style={{ width: '100%', padding: 11, background: project.status === '終了' ? '#94a3b8' : c, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: project.status === '終了' ? 'not-allowed' : 'pointer' }}>
+                            {project.status === '終了' ? '募集終了' : 'このプランで支援する'}
+                          </button>
+
+                          {/* コメント欄 */}
+                          <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8, fontWeight: 700 }}>💬 応援コメント ({comments.length})</p>
+                            {comments.map((cm, ci) => (
+                              <div key={ci} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: 8, marginBottom: 8, fontSize: 13, color: '#334155' }}>
+                                <strong>{cm.name}</strong>: {cm.comment}
+                              </div>
+                            ))}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input
+                                value={newComment[tier.id] || ''}
+                                onChange={e => setNewComment(p => ({ ...p, [tier.id]: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter') addComment(tier.id); }}
+                                placeholder="応援メッセージを入力…"
+                                style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}
+                              />
+                              <button onClick={() => addComment(tier.id)}
+                                style={{ padding: '8px 16px', background: c, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                                送信
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <p style={{ fontSize: '0.875rem', color: '#4b5563', lineHeight: 1.7, margin: 0 }}>
-                          {tier.description}
-                        </p>
-                        {remaining !== null && (
-                          <p style={{ fontSize: '0.8rem', color: remaining <= 5 ? '#dc2626' : '#6b7280', fontWeight: remaining <= 5 ? 700 : 400, margin: 0 }}>
-                            {'残り ' + remaining + ' 枠 / ' + tier.max_supporters + ' 枠'}
-                          </p>
-                        )}
-                        <button
-                          onClick={() => router.push('/support/' + projectId + '?tier=' + tier.id)}
-                          style={{ marginTop: 'auto', padding: '0.6rem 1rem', background: tc.border, color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }}
-                        >
-                          このティアで支援する
-                        </button>
                       </div>
                     );
                   })}
                 </div>
               )}
-            </div>
 
+              {/* ── 支援者 ── */}
+              {activeTab === 'supporters' && (
+                <div>
+                  {supporters.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>まだ支援者はいません。最初の支援者になりましょう！</p>}
+                  {supporters.map((s, idx) => (
+                    <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e8f4fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏸</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>
+                            {String(s['名前'] || '名前未設定')}
+                          </span>
+                          <span style={{ color: '#2563eb', fontWeight: 700, fontSize: 15 }}>
+                            ¥{(Number(s['total_amount']) || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        {s['メッセージ'] && (
+                          <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>{String(s['メッセージ'])}</p>
+                        )}
+                        <span style={{ color: '#94a3b8', fontSize: 11 }}>
+                          {s['created_at'] ? new Date(String(s['created_at'])).toLocaleDateString('ja-JP') : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* RIGHT SIDEBAR */}
-          <div style={{ flex: '0 0 300px', position: 'sticky', top: '80px' }}>
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '2px solid #dbeafe' }}>
-
-              <div style={{ marginBottom: '1.2rem' }}>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#0f2d5a', fontFamily: "'Noto Serif JP', serif" }}>
-                  {'¥' + totalRaised.toLocaleString()}
+          {/* ── 右サイドバー ── */}
+          <div>
+            <div style={{ background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', position: 'sticky', top: 24 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                  <span style={{ color: '#64748b', fontSize: 12 }}>達成率</span>
+                  <span style={{ fontSize: 28, fontWeight: 800, color: '#1a2e4a' }}>{progressPct}%</span>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.2rem' }}>
-                  {'目標: ¥' + project.goal.toLocaleString()}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '1.2rem' }}>
-                <div style={{ background: '#e5e7eb', borderRadius: '999px', height: '10px', overflow: 'hidden' }}>
-                  <div style={{ width: progressPct + '%', height: '100%', background: 'linear-gradient(90deg, #1e3a5f, #2563eb)', borderRadius: '999px', transition: 'width 0.5s' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', fontSize: '0.85rem' }}>
-                  <span style={{ fontWeight: 700, color: '#1d4ed8' }}>{progressPct + '% 達成'}</span>
-                  <span style={{ color: '#6b7280' }}>{supporters.length + '人が支援'}</span>
+                <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${progressPct}%`, background: 'linear-gradient(90deg, #2563eb, #059669)', borderRadius: 4, transition: 'width 0.8s ease' }} />
                 </div>
               </div>
 
-              <div style={{ textAlign: 'center', background: '#f0f4f8', borderRadius: '8px', padding: '0.8rem', marginBottom: '1.2rem' }}>
-                {daysLeft !== null ? (
-                  <div>
-                    <div style={{ fontSize: '2.2rem', fontWeight: 700, color: daysLeft <= 7 ? '#dc2626' : '#0f2d5a', fontFamily: "'Noto Serif JP', serif" }}>
-                      {daysLeft}
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>日残り</div>
-                  </div>
-                ) : (
-                  <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>期限未設定</div>
-                )}
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#1a2e4a', marginBottom: 4 }}>
+                ¥{totalRaised.toLocaleString()}
+              </div>
+              <div style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
+                目標: ¥{project.goal.toLocaleString()}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                <div style={{ background: '#f8fafc', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#2563eb' }}>{supporters.length}</div>
+                  <div style={{ color: '#64748b', fontSize: 12 }}>支援者数</div>
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: days.color }}>{days.text}</div>
+                  <div style={{ color: '#64748b', fontSize: 12 }}>残り期間</div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <span style={{ padding: '6px 20px', borderRadius: 20, fontWeight: 800, fontSize: 14, background: statusBadge.bg, color: statusBadge.color }}>
+                  {statusBadge.label}
+                </span>
               </div>
 
               <button
-                onClick={() => router.push('/support/' + projectId)}
-                style={{ width: '100%', padding: '0.9rem', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '1rem', marginBottom: '1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(245,158,11,0.4)' }}
-              >
-                🔑 このプロジェクトを支援する
+                onClick={() => setActiveTab('tiers')}
+                disabled={project.status === '終了'}
+                style={{ width: '100%', padding: 14, marginBottom: 12, background: project.status === '終了' ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1a2e4a)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 16, cursor: project.status === '終了' ? 'not-allowed' : 'pointer' }}>
+                {project.status === '終了' ? '募集終了' : '🏸 支援する'}
+              </button>
+              <button onClick={() => setActiveTab('tiers')}
+                style={{ width: '100%', padding: 10, background: '#f8fafc', color: '#2563eb', border: '2px solid #2563eb', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                支援プランを見る
               </button>
 
-              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
-                <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.7rem', textAlign: 'center', marginTop: 0 }}>
-                  シェアして応援
-                </p>
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <a
-                    href={'https://twitter.com/intent/tweet?url=' + encodeURIComponent(projectUrl) + '&text=' + encodeURIComponent(project.title)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ padding: '0.45rem 0.9rem', background: '#1da1f2', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    X
-                  </a>
-                  <a
-                    href={'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(projectUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ padding: '0.45rem 0.9rem', background: '#06c755', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    LINE
-                  </a>
-                  <a
-                    href={'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(projectUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ padding: '0.45rem 0.9rem', background: '#1877f2', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    FB
-                  </a>
-                  <button
-                    onClick={handleCopy}
-                    style={{ padding: '0.45rem 0.9rem', background: copied ? '#10b981' : '#e1306c', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    {copied ? '✓コピー済' : '📷 IG'}
+              <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8, textAlign: 'center' }}>シェアして応援！</p>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <button onClick={copyUrl}
+                    style={{ padding: '6px 14px', background: copied ? '#059669' : '#f1f5f9', color: copied ? '#fff' : '#475569', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    {copied ? '✅' : '🔗'} コピー
                   </button>
+                  <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(project.title)}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ padding: '6px 14px', background: '#000', color: '#fff', borderRadius: 6, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>𝕏</a>
+                  <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ padding: '6px 14px', background: '#00b900', color: '#fff', borderRadius: 6, fontSize: 12, textDecoration: 'none', fontWeight: 700 }}>LINE</a>
                 </div>
               </div>
-
             </div>
           </div>
-
         </div>
-      </main>
-
-      {/* FOOTER */}
-      <footer style={{ background: '#0f2d5a', color: '#94a3b8', padding: '2rem 1.5rem', marginTop: '4rem', textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1rem', fontSize: '0.85rem' }}>
-          <Link href="/" style={{ color: '#94a3b8', textDecoration: 'none' }}>トップページ</Link>
-          <Link href="/projects/new" style={{ color: '#94a3b8', textDecoration: 'none' }}>プロジェクトを作成</Link>
-          <Link href="/support" style={{ color: '#94a3b8', textDecoration: 'none' }}>支援方法について</Link>
-        </div>
-        <p style={{ fontSize: '0.78rem', margin: 0 }}>
-          © 2025 CLOUDFAN – 北海道スポーツ応援クラウドファンディング 🏸⛸
-        </p>
-      </footer>
-
-    </div>
+      </div>
+    </>
   );
 }
