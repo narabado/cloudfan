@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
@@ -77,6 +77,7 @@ function getYouTubeId(url: string): string | null {
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [project,      setProject]      = useState<Project | null>(null);
   const [tiers,        setTiers]        = useState<Tier[]>([]);
   const [supporters,   setSupporters]   = useState<Supporter[]>([]);
