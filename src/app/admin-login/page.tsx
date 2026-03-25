@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,10 +22,10 @@ export default function AdminLoginPage() {
         router.push('/admin');
         router.refresh();
       } else {
-        setError('❌ パスワードが違います');
+        setError('笶・繝代せ繝ｯ繝ｼ繝峨′驕輔＞縺ｾ縺・);
       }
     } catch {
-      setError('エラーが発生しました');
+      setError('繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆');
     } finally {
       setLoading(false);
     }
@@ -54,17 +54,17 @@ export default function AdminLoginPage() {
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 900, color: '#1a2e4a', marginBottom: 6 }}>
-          CloudFan 管理者
+          CloudFan 邂｡逅・・
         </h1>
         <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 32 }}>
-          🔒 管理者専用エリアです
+          白 邂｡逅・・ｰら畑繧ｨ繝ｪ繧｢縺ｧ縺・
         </p>
         <input
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleLogin(); }}
-          placeholder="パスワードを入力"
+          placeholder="繝代せ繝ｯ繝ｼ繝峨ｒ蜈･蜉・
           autoFocus
           style={{
             width: '100%',
@@ -108,12 +108,13 @@ export default function AdminLoginPage() {
             boxShadow: loading ? 'none' : '0 4px 14px rgba(37,99,235,0.35)',
           }}
         >
-          {loading ? '確認中...' : '🔓 ログイン'}
+          {loading ? '遒ｺ隱堺ｸｭ...' : '箔 繝ｭ繧ｰ繧､繝ｳ'}
         </button>
         <p style={{ marginTop: 20, fontSize: 12, color: '#cbd5e1' }}>
-          ブラウザを閉じると自動ログアウトします
+          繝悶Λ繧ｦ繧ｶ繧帝哩縺倥ｋ縺ｨ閾ｪ蜍輔Ο繧ｰ繧｢繧ｦ繝医＠縺ｾ縺・
         </p>
       </div>
     </div>
   );
 }
+
