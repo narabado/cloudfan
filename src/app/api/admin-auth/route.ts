@@ -1,3 +1,7 @@
+﻿import { NextResponse } from "next/server";
+const ADMIN_PASSWORD = "NBD3890";
+$routeFile = "C:\Users\user\Desktop\sports-support-hokkaido\src\app\api\admin-auth\route.ts"
+$routeContent = @'
 import { NextResponse } from "next/server";
 
 const ADMIN_PASSWORD = "NBD3890";
@@ -8,9 +12,10 @@ export async function POST(request: Request) {
 
     if (password === ADMIN_PASSWORD) {
       const response = NextResponse.json({ ok: true });
-      response.cookies.set("admin_auth", ADMIN_PASSWORD, {
+      response.cookies.set("admin_auth", "NBD3890", {
         httpOnly: true,
-        maxAge: 60 * 60 * 24, // 1日
+        secure: true,
+        maxAge: 60 * 60 * 24,
         path: "/",
         sameSite: "lax",
       });
