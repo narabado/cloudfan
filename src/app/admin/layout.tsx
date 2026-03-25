@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const ADMIN_PASSWORD = 'cloudfan2025';
+const ADMIN_PASSWORD = 'NBD3890';
 const SESSION_KEY = 'admin_authenticated';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
