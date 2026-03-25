@@ -1,10 +1,9 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
-// ── 型定義 ──────────────────────────────────────────────────
 interface Tier {
   id: string;
   name: string;
@@ -38,16 +37,14 @@ interface TierComment {
   comment: string;
 }
 
-// ── 共感を呼ぶ章タイトル（寄付成功率の高いパターン） ───────────
 const CHAPTER_TITLES = [
-  '🔥 なぜ今、支援が必要なのか',
-  '🏆 私たちの挑戦と夢',
-  '💰 支援金の具体的な使い道',
-  '🌟 あなたの支援で変わること',
-  '💌 チームからのメッセージ',
+  '🏆 なぜ支援が必要なのか',
+  '🎯 私たちの挑戦と夢',
+  '💪 支援金の具体的な使い道',
+  '✨ あなたの支援で変わること',
+  '📣 チームからのメッセージ',
 ];
 
-// ── ユーティリティ ───────────────────────────────────────────
 function calcDaysLeft(deadline: string | null): { text: string; color: string } {
   if (!deadline || deadline.trim() === '') return { text: '期限未設定', color: '#94a3b8' };
   const d = new Date(deadline);
@@ -65,7 +62,7 @@ function getStatusBadge(status: string) {
   if (status === '終了' || status === 'closed' || status === 'ended')
     return { label: '🔴 終了',   bg: '#fee2e2', color: '#991b1b' };
   if (status === '達成' || status === 'achieved')
-    return { label: '🏆 達成',   bg: '#fef9c3', color: '#854d0e' };
+    return { label: '🌟 達成',   bg: '#fef9c3', color: '#854d0e' };
   return { label: status, bg: '#f1f5f9', color: '#475569' };
 }
 
@@ -78,7 +75,6 @@ function getYouTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-// ── メインコンポーネント ──────────────────────────────────────
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const [project,      setProject]      = useState<Project | null>(null);
@@ -87,7 +83,7 @@ export default function ProjectDetail() {
   const [totalRaised,  setTotalRaised]  = useState(0);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState('');
-  const [activeTab,    setActiveTab]    = useState<'story' | 'tiers' | 'supporters'>('story');
+  const [activeTab,    setActiveTab]    = useState<'story' | 'tiers' | 'supporters' | 'ranking'>('story');
   const [copied,       setCopied]       = useState(false);
   const [tierComments, setTierComments] = useState<TierComment[]>([]);
   const [newComment,   setNewComment]   = useState<Record<string, string>>({});
@@ -96,7 +92,6 @@ export default function ProjectDetail() {
     if (!id) return;
     (async () => {
       setLoading(true);
-
       const { data: proj, error: pErr } = await supabase
         .from('crowdfunding_projects')
         .select('*')
@@ -109,21 +104,18 @@ export default function ProjectDetail() {
       }
       setProject(proj as unknown as Project);
 
-      // ✅ amountカラムの404エラーを回避するためidでソート
       const { data: tierRows } = await supabase
         .from('project_tiers')
         .select('*')
         .eq('project_id', id)
         .order('id', { ascending: true });
       if (tierRows && tierRows.length > 0) {
-        // amount でクライアント側ソート
         const sorted = [...(tierRows as unknown as Tier[])].sort((a, b) => a.amount - b.amount);
         setTiers(sorted);
       } else if (Array.isArray(proj.tiers)) {
         setTiers(proj.tiers as Tier[]);
       }
 
-      // ✅ select('*') で日本語カラム名も全取得
       const { data: supRows, error: sErr } = await supabase
         .from('supporters')
         .select('*')
@@ -140,7 +132,6 @@ export default function ProjectDetail() {
         );
         setTotalRaised(total);
       }
-
       setLoading(false);
     })();
   }, [id]);
@@ -148,7 +139,7 @@ export default function ProjectDetail() {
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🏸</div>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
         <p style={{ color: '#1a2e4a', fontWeight: 700 }}>読み込み中…</p>
       </div>
     </div>
@@ -164,7 +155,6 @@ export default function ProjectDetail() {
     : [];
   const heroImage   = imgs[0] || null;
   const storyImages = imgs.slice(1);
-
   const storyParts  = (project.story || '').split('---').map(s => s.trim()).filter(Boolean);
   const storyBlocks = [0, 1, 2, 3, 4].map(i => ({
     text:  storyParts[i]  || '',
@@ -181,7 +171,7 @@ export default function ProjectDetail() {
 
   const tierCount: Record<string, number> = {};
   for (const s of supporters) {
-    const key = String(s['ティア'] || '');
+    const key = String(s['tier_name'] || s['\u30C6\u30A3\u30A2'] || '');
     if (key) tierCount[key] = (tierCount[key] || 0) + 1;
   }
   const rankedTiers = [...tiers].sort((a, b) => {
@@ -192,10 +182,15 @@ export default function ProjectDetail() {
   const topTiers   = rankedTiers.slice(0, Math.min(5, rankedTiers.length));
   const tierColors = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
 
+  const rankedSupporters = [...supporters].sort(
+    (a, b) => (Number(b['total_amount']) || 0) - (Number(a['total_amount']) || 0)
+  );
+  const rankMedals = ['\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'];
+
   const addComment = (tierId: string) => {
     const text = (newComment[tierId] || '').trim();
     if (!text) return;
-    setTierComments(prev => [{ tierId, name: '匿名', comment: text }, ...prev]);
+    setTierComments(prev => [{ tierId, name: '\u533F\u540D', comment: text }, ...prev]);
     setNewComment(prev => ({ ...prev, [tierId]: '' }));
   };
 
@@ -206,18 +201,15 @@ export default function ProjectDetail() {
     });
   };
 
-  // ✅ 目立つタブボタンスタイル
   const tabStyle = (tab: string): React.CSSProperties => ({
     padding: '12px 20px',
     border: activeTab === tab ? 'none' : '2px solid #e2e8f0',
     cursor: 'pointer',
     fontSize: 14,
     fontWeight: 800,
-    borderRadius: activeTab === tab ? '10px 10px 0 0' : '10px 10px 0 0',
-    background: activeTab === tab
-      ? 'linear-gradient(135deg, #1a2e4a, #2563eb)'
-      : '#fff',
-    color:  activeTab === tab ? '#fff' : '#64748b',
+    borderRadius: '10px 10px 0 0',
+    background: activeTab === tab ? 'linear-gradient(135deg, #1a2e4a, #2563eb)' : '#fff',
+    color: activeTab === tab ? '#fff' : '#64748b',
     transition: 'all 0.2s',
     boxShadow: activeTab === tab ? '0 -3px 12px rgba(37,99,235,0.3)' : 'none',
     transform: activeTab === tab ? 'translateY(-2px)' : 'none',
@@ -229,7 +221,6 @@ export default function ProjectDetail() {
     <>
       <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: '#f8fafc', minHeight: '100vh' }}>
 
-        {/* ── NavBar ── */}
         <nav style={{
           background: '#1a2e4a', padding: '0 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -242,64 +233,44 @@ export default function ProjectDetail() {
             <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>CloudFan</span>
           </Link>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {/* ✅ 目立つナビボタン */}
-            <Link href="/"
-              style={{
-                color: '#fff', padding: '8px 18px', fontSize: 14, textDecoration: 'none',
-                border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: 8,
-                fontWeight: 700, background: 'rgba(255,255,255,0.08)',
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>
-              ← トップへ戻る
-            </Link>
-            <Link href="/admin"
-              style={{
-                color: '#1a2e4a', padding: '8px 18px', fontSize: 13, textDecoration: 'none',
-                background: '#d4af37', borderRadius: 8, fontWeight: 700,
-              }}>
-              管理
-            </Link>
+            <Link href="/" style={{
+              color: '#fff', padding: '8px 18px', fontSize: 14, textDecoration: 'none',
+              border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: 8,
+              fontWeight: 700, background: 'rgba(255,255,255,0.08)',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>← トップへ戻る</Link>
+            <Link href="/admin" style={{
+              color: '#1a2e4a', padding: '8px 18px', fontSize: 13, textDecoration: 'none',
+              background: '#d4af37', borderRadius: 8, fontWeight: 700,
+            }}>管理</Link>
           </div>
         </nav>
 
-        {/* ── ヒーロー画像 ── */}
         {heroImage && (
           <div style={{ width: '100%', height: 360, overflow: 'hidden', position: 'relative' }}>
-            <img src={heroImage} alt="hero"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+            <img src={heroImage} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%)' }} />
             <div style={{
               position: 'absolute', top: 16, right: 16, padding: '6px 16px',
               borderRadius: 20, background: statusBadge.bg, color: statusBadge.color,
               fontWeight: 700, fontSize: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            }}>
-              {statusBadge.label}
-            </div>
+            }}>{statusBadge.label}</div>
           </div>
         )}
 
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
-
-          {/* ── 左コンテンツ ── */}
           <div>
-            {/* タグ */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {([project.school, project.club, project.region] as string[]).filter(Boolean).map((t, i) => (
                 <span key={i} style={{ background: '#e8f4fd', color: '#1a56db', padding: '4px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{t}</span>
               ))}
               {!heroImage && (
-                <span style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>
-                  {statusBadge.label}
-                </span>
+                <span style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
               )}
             </div>
 
-            <h1 style={{ fontSize: 26, color: '#0f172a', marginBottom: 12, lineHeight: 1.5, fontWeight: 900 }}>
-              {project.title}
-            </h1>
-            <p style={{ color: '#475569', fontSize: 15, lineHeight: 1.9, marginBottom: 20 }}>
-              {project.description}
-            </p>
+            <h1 style={{ fontSize: 26, color: '#0f172a', marginBottom: 12, lineHeight: 1.5, fontWeight: 900 }}>{project.title}</h1>
+            <p style={{ color: '#475569', fontSize: 15, lineHeight: 1.9, marginBottom: 20 }}>{project.description}</p>
 
             {project.deadline && (
               <div style={{ marginBottom: 16, padding: '10px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -311,34 +282,28 @@ export default function ProjectDetail() {
               </div>
             )}
 
-            {/* SNSシェア */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
-              <button onClick={copyUrl}
-                style={{ padding: '8px 18px', background: copied ? '#059669' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                {copied ? '✅ コピー済み' : '🔗 URLをコピー'}
+              <button onClick={copyUrl} style={{ padding: '8px 18px', background: copied ? '#059669' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                {copied ? '✅ コピー完了' : '🔗 URLをコピー'}
               </button>
               <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(project.title)}&url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
                 target="_blank" rel="noreferrer"
-                style={{ padding: '8px 18px', background: '#000', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>
-                𝕏 シェア
-              </a>
+                style={{ padding: '8px 18px', background: '#000', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>𝕏 シェア</a>
               <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
                 target="_blank" rel="noreferrer"
-                style={{ padding: '8px 18px', background: '#00b900', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>
-                LINE
-              </a>
+                style={{ padding: '8px 18px', background: '#00b900', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>LINE</a>
             </div>
 
-            {/* ✅ 目立つタブナビゲーション */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 0, alignItems: 'flex-end' }}>
+            {/* ── タブナビゲーション（4つ） ── */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 0, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               {([
                 { key: 'story',      label: '📖 ストーリー' },
-                { key: 'tiers',      label: '🎁 支援プラン' },
+                { key: 'tiers',      label: '💎 支援プラン' },
                 { key: 'supporters', label: '👥 支援者' },
+                { key: 'ranking',    label: '🏆 支援者ランキング' },
               ] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setActiveTab(key)} style={tabStyle(key)}>
                   {label}
-                  {/* アクティブ時に下線インジケーター */}
                   {activeTab === key && (
                     <span style={{
                       position: 'absolute', bottom: -2, left: '50%',
@@ -351,7 +316,7 @@ export default function ProjectDetail() {
               ))}
             </div>
 
-            {/* ✅ タブコンテンツ */}
+            {/* ── タブコンテンツ ── */}
             <div style={{
               background: '#fff', padding: 28,
               borderRadius: activeTab === 'story' ? '0 8px 8px 8px' : '8px',
@@ -359,26 +324,21 @@ export default function ProjectDetail() {
               border: '1px solid #e2e8f0',
             }}>
 
-              {/* ── ストーリー ── */}
+              {/* ストーリー */}
               {activeTab === 'story' && (
                 <div>
                   {storyBlocks.length === 0 && (
-                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>
-                      ストーリーはまだ登録されていません。
-                    </p>
+                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>ストーリーはまだ登録されていません。</p>
                   )}
                   {storyBlocks.map((block, i) => (
                     <div key={i} style={{ marginBottom: 48, paddingBottom: 40, borderBottom: i < storyBlocks.length - 1 ? '2px dashed #e2e8f0' : 'none' }}>
-                      {/* ✅ 共感を呼ぶ章タイトル */}
                       <h3 style={{
                         background: 'linear-gradient(135deg, #1a2e4a, #2563eb)',
                         color: '#fff', padding: '12px 20px',
                         borderRadius: 10, marginBottom: 20, fontSize: 16,
                         fontWeight: 800, letterSpacing: '0.02em',
                         boxShadow: '0 3px 10px rgba(37,99,235,0.25)',
-                      }}>
-                        {CHAPTER_TITLES[i] || `第${i + 1}章`}
-                      </h3>
+                      }}>{CHAPTER_TITLES[i] || `第${i + 1}章`}</h3>
                       <div style={{ display: 'grid', gridTemplateColumns: block.image ? '1fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
                         <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap' }}>{block.text}</p>
                         {block.image && (
@@ -390,7 +350,7 @@ export default function ProjectDetail() {
                   ))}
                   {ytId && (
                     <div style={{ marginTop: 32 }}>
-                      <h3 style={{ color: '#1a2e4a', marginBottom: 12, fontWeight: 800 }}>🎬 活動紹介動画</h3>
+                      <h3 style={{ color: '#1a2e4a', marginBottom: 12, fontWeight: 800 }}>▶️ 紹介動画</h3>
                       <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
                         <iframe src={`https://www.youtube.com/embed/${ytId}`}
                           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 10 }}
@@ -398,56 +358,40 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                   )}
-
-                  {/* ✅ ストーリー下部に支援CTAボタン（目立つ） */}
                   {!ended && (
                     <div style={{ marginTop: 40, padding: 24, background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)', borderRadius: 12, textAlign: 'center', border: '1px solid #bfdbfe' }}>
-                      <p style={{ color: '#1a2e4a', fontWeight: 800, fontSize: 16, marginBottom: 8 }}>
-                        🏸 このプロジェクトを応援しませんか？
-                      </p>
-                      <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
-                        あなたの支援が選手たちの夢を実現します
-                      </p>
-                      <button
-                        onClick={() => setActiveTab('tiers')}
-                        style={{
-                          padding: '14px 48px',
-                          background: 'linear-gradient(135deg, #d4af37, #f5d060)',
-                          color: '#1a2e4a', border: 'none', borderRadius: 40,
-                          fontWeight: 800, fontSize: 16, cursor: 'pointer',
-                          boxShadow: '0 4px 16px rgba(212,175,55,0.4)',
-                        }}>
-                        🎁 支援プランを見る →
-                      </button>
+                      <p style={{ color: '#1a2e4a', fontWeight: 800, fontSize: 16, marginBottom: 8 }}>⏳ このプロジェクトを応援しませんか？</p>
+                      <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>あなたの支援が選手たちの夢を実現します。</p>
+                      <button onClick={() => setActiveTab('tiers')} style={{
+                        padding: '14px 48px',
+                        background: 'linear-gradient(135deg, #d4af37, #f5d060)',
+                        color: '#1a2e4a', border: 'none', borderRadius: 40,
+                        fontWeight: 800, fontSize: 16, cursor: 'pointer',
+                        boxShadow: '0 4px 16px rgba(212,175,55,0.4)',
+                      }}>💎 支援プランを見る →</button>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* ── 支援プラン ── */}
+              {/* 支援プラン */}
               {activeTab === 'tiers' && (
                 <div>
                   <div style={{ marginBottom: 20, padding: '12px 18px', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', borderRadius: 10, border: '1px solid #bfdbfe' }}>
-                    <p style={{ margin: 0, color: '#1e40af', fontSize: 14, fontWeight: 800 }}>
-                      🏆 支援が集まりやすい上位{topTiers.length}プランを表示しています
-                    </p>
+                    <p style={{ margin: 0, color: '#1e40af', fontSize: 14, fontWeight: 800 }}>🌟 支援が集まりやすい上位{topTiers.length}プランを表示しています</p>
                   </div>
                   {topTiers.length === 0 && (
-                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>
-                      支援プランはまだ登録されていません。
-                    </p>
+                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>支援プランはまだ登録されていません。</p>
                   )}
                   {topTiers.map((tier, i) => {
-                    const c        = tierColors[i] || '#1a56db';
-                    const sCount   = tierCount[tier.name] || 0;
+                    const c = tierColors[i] || '#1a56db';
+                    const sCount = tierCount[tier.name] || 0;
                     const comments = tierComments.filter(t => t.tierId === tier.id);
                     return (
                       <div key={tier.id} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
                         <div style={{ background: c, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ background: 'rgba(255,255,255,0.3)', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 14 }}>
-                              {i + 1}
-                            </span>
+                            <span style={{ background: 'rgba(255,255,255,0.3)', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 14 }}>{i + 1}</span>
                             <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>{tier.name}</span>
                           </div>
                           <span style={{ color: '#fff', fontWeight: 900, fontSize: 20 }}>¥{tier.amount.toLocaleString()}</span>
@@ -458,21 +402,14 @@ export default function ProjectDetail() {
                             <span>👥 {sCount}人が支援</span>
                             {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
                           </div>
-                          {/* ✅ 支援ボタン目立つ */}
-                          <button
-                            disabled={ended}
-                            style={{
-                              width: '100%', padding: 13,
-                              background: ended ? '#94a3b8' : `linear-gradient(135deg, ${c}, ${c}dd)`,
-                              color: '#fff', border: 'none', borderRadius: 10,
-                              fontWeight: 800, fontSize: 15, cursor: ended ? 'not-allowed' : 'pointer',
-                              boxShadow: ended ? 'none' : `0 4px 14px ${c}55`,
-                              letterSpacing: '0.03em',
-                            }}>
-                            {ended ? '募集終了' : `🎁 ¥${tier.amount.toLocaleString()}で支援する`}
-                          </button>
-
-                          {/* コメント欄 */}
+                          <button disabled={ended} style={{
+                            width: '100%', padding: 13,
+                            background: ended ? '#94a3b8' : `linear-gradient(135deg, ${c}, ${c}dd)`,
+                            color: '#fff', border: 'none', borderRadius: 10,
+                            fontWeight: 800, fontSize: 15, cursor: ended ? 'not-allowed' : 'pointer',
+                            boxShadow: ended ? 'none' : `0 4px 14px ${c}55`,
+                            letterSpacing: '0.03em',
+                          }}>{ended ? '募集終了' : `💎 ¥${tier.amount.toLocaleString()}で支援する`}</button>
                           <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8, fontWeight: 700 }}>💬 応援コメント ({comments.length})</p>
                             {comments.map((cm, ci) => (
@@ -481,17 +418,13 @@ export default function ProjectDetail() {
                               </div>
                             ))}
                             <div style={{ display: 'flex', gap: 8 }}>
-                              <input
-                                value={newComment[tier.id] || ''}
+                              <input value={newComment[tier.id] || ''}
                                 onChange={e => setNewComment(p => ({ ...p, [tier.id]: e.target.value }))}
                                 onKeyDown={e => { if (e.key === 'Enter') addComment(tier.id); }}
                                 placeholder="応援メッセージを入力…"
-                                style={{ flex: 1, padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}
-                              />
+                                style={{ flex: 1, padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
                               <button onClick={() => addComment(tier.id)}
-                                style={{ padding: '9px 18px', background: c, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
-                                送信
-                              </button>
+                                style={{ padding: '9px 18px', background: c, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>送信</button>
                             </div>
                           </div>
                         </div>
@@ -501,30 +434,22 @@ export default function ProjectDetail() {
                 </div>
               )}
 
-              {/* ── 支援者 ── */}
+              {/* 支援者（時系列） */}
               {activeTab === 'supporters' && (
                 <div>
                   <div style={{ marginBottom: 20, padding: '12px 18px', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', borderRadius: 10, border: '1px solid #bbf7d0' }}>
-                    <p style={{ margin: 0, color: '#166534', fontSize: 14, fontWeight: 800 }}>
-                      🙏 {supporters.length}人がこのプロジェクトを支援しています
-                    </p>
+                    <p style={{ margin: 0, color: '#166534', fontSize: 14, fontWeight: 800 }}>🎉 {supporters.length}人がこのプロジェクトを支援しています</p>
                   </div>
                   {supporters.length === 0 && (
-                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>
-                      まだ支援者はいません。最初の支援者になりましょう！
-                    </p>
+                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>まだ支援者がいません。最初の支援者になりましょう！</p>
                   )}
                   {supporters.map((s, idx) => (
                     <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
-                      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #1a2e4a, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🏸</div>
+                      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #1a2e4a, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>⭐</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>
-                            {String(s['名前'] || s['name'] || '名前未設定')}
-                          </span>
-                          <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16 }}>
-                            ¥{(Number(s['total_amount']) || 0).toLocaleString()}
-                          </span>
+                          <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>{String(s['名前'] || s['name'] || '名前未設定')}</span>
+                          <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16 }}>¥{(Number(s['total_amount']) || 0).toLocaleString()}</span>
                         </div>
                         {s['メッセージ'] && (
                           <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>{String(s['メッセージ'])}</p>
@@ -537,13 +462,80 @@ export default function ProjectDetail() {
                   ))}
                 </div>
               )}
+
+              {/* 🏆 支援者ランキング（金額降順） */}
+              {activeTab === 'ranking' && (
+                <div>
+                  <div style={{ marginBottom: 24, padding: '14px 18px', background: 'linear-gradient(135deg, #fef9c3, #fef3c7)', borderRadius: 10, border: '1px solid #fde68a', textAlign: 'center' }}>
+                    <p style={{ margin: 0, color: '#92400e', fontSize: 15, fontWeight: 800 }}>🏆 支援者ランキング（支援金額順）</p>
+                    <p style={{ margin: '4px 0 0', color: '#a16207', fontSize: 13 }}>多くご支援いただいた方から順に表示しています</p>
+                  </div>
+                  {rankedSupporters.length === 0 && (
+                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>まだ支援者がいません。最初の支援者になりましょう！</p>
+                  )}
+                  {rankedSupporters.map((s, idx) => {
+                    const amount = Number(s['total_amount']) || 0;
+                    const isTop3 = idx < 3;
+                    const medal = rankMedals[idx];
+                    return (
+                      <div key={String(s['id'] || idx)} style={{
+                        display: 'flex', gap: 16, padding: '16px 20px', marginBottom: 12,
+                        borderRadius: 12, alignItems: 'center',
+                        background: isTop3
+                          ? idx === 0 ? 'linear-gradient(135deg, #fef9c3, #fef3c7)'
+                          : idx === 1 ? 'linear-gradient(135deg, #f1f5f9, #e2e8f0)'
+                          : 'linear-gradient(135deg, #fff7ed, #ffedd5)'
+                          : '#f8fafc',
+                        border: isTop3
+                          ? idx === 0 ? '2px solid #fbbf24'
+                          : idx === 1 ? '2px solid #94a3b8'
+                          : '2px solid #fb923c'
+                          : '1px solid #e2e8f0',
+                        boxShadow: isTop3 ? '0 4px 16px rgba(0,0,0,0.08)' : 'none',
+                      }}>
+                        <div style={{
+                          width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+                          background: isTop3
+                            ? idx === 0 ? 'linear-gradient(135deg, #f59e0b, #fbbf24)'
+                            : idx === 1 ? 'linear-gradient(135deg, #64748b, #94a3b8)'
+                            : 'linear-gradient(135deg, #ea580c, #fb923c)'
+                            : '#e2e8f0',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: isTop3 ? 24 : 15, fontWeight: 900,
+                          color: isTop3 ? '#fff' : '#64748b',
+                          boxShadow: isTop3 ? '0 3px 10px rgba(0,0,0,0.2)' : 'none',
+                        }}>
+                          {isTop3 ? medal : `${idx + 1}`}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 800, color: '#1a2e4a', fontSize: isTop3 ? 16 : 14 }}>
+                              {String(s['名前'] || s['name'] || '匿名サポーター')}
+                            </span>
+                            <span style={{
+                              fontWeight: 900, fontSize: isTop3 ? 22 : 16,
+                              color: idx === 0 ? '#d97706' : idx === 1 ? '#64748b' : idx === 2 ? '#ea580c' : '#2563eb',
+                            }}>¥{amount.toLocaleString()}</span>
+                          </div>
+                          {s['メッセージ'] && (
+                            <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>💬 {String(s['メッセージ'])}</p>
+                          )}
+                          <span style={{ color: '#94a3b8', fontSize: 11 }}>
+                            {s['created_at'] ? new Date(String(s['created_at'])).toLocaleDateString('ja-JP') : ''}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
             </div>
           </div>
 
-          {/* ── 右サイドバー ── */}
+          {/* 右サイドバー */}
           <div>
             <div style={{ background: '#fff', borderRadius: 18, padding: 24, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'sticky', top: 80, border: '1px solid #e2e8f0' }}>
-              {/* 達成率 */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                   <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>達成率</span>
@@ -553,14 +545,8 @@ export default function ProjectDetail() {
                   <div style={{ height: '100%', width: `${progressPct}%`, background: 'linear-gradient(90deg, #2563eb, #059669)', borderRadius: 5, transition: 'width 1s ease' }} />
                 </div>
               </div>
-
-              <div style={{ fontSize: 30, fontWeight: 900, color: '#1a2e4a', marginBottom: 4 }}>
-                ¥{totalRaised.toLocaleString()}
-              </div>
-              <div style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
-                目標: ¥{project.goal.toLocaleString()}
-              </div>
-
+              <div style={{ fontSize: 30, fontWeight: 900, color: '#1a2e4a', marginBottom: 4 }}>¥{totalRaised.toLocaleString()}</div>
+              <div style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>目標: ¥{project.goal.toLocaleString()}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
                 <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '12px 8px', textAlign: 'center', border: '1px solid #bae6fd' }}>
                   <div style={{ fontSize: 24, fontWeight: 900, color: '#0369a1' }}>{supporters.length}</div>
@@ -571,44 +557,28 @@ export default function ProjectDetail() {
                   <div style={{ color: '#64748b', fontSize: 12, fontWeight: 600 }}>残り期間</div>
                 </div>
               </div>
-
               <div style={{ textAlign: 'center', marginBottom: 18 }}>
-                <span style={{ padding: '8px 24px', borderRadius: 20, fontWeight: 800, fontSize: 14, background: statusBadge.bg, color: statusBadge.color, border: `1.5px solid ${statusBadge.color}44` }}>
-                  {statusBadge.label}
-                </span>
+                <span style={{ padding: '8px 24px', borderRadius: 20, fontWeight: 800, fontSize: 14, background: statusBadge.bg, color: statusBadge.color, border: `1.5px solid ${statusBadge.color}44` }}>{statusBadge.label}</span>
               </div>
-
-              {/* ✅ メイン支援ボタン（大きく目立つ） */}
-              <button
-                onClick={() => setActiveTab('tiers')}
-                disabled={ended}
-                style={{
-                  width: '100%', padding: '16px 0', marginBottom: 12,
-                  background: ended ? '#94a3b8' : 'linear-gradient(135deg, #d4af37, #f5d060)',
-                  color: ended ? '#fff' : '#1a2e4a',
-                  border: 'none', borderRadius: 12, fontWeight: 900, fontSize: 17,
-                  cursor: ended ? 'not-allowed' : 'pointer',
-                  boxShadow: ended ? 'none' : '0 6px 20px rgba(212,175,55,0.45)',
-                  letterSpacing: '0.03em',
-                }}>
-                {ended ? '募集終了' : '🏸 今すぐ支援する'}
-              </button>
-              <button onClick={() => setActiveTab('tiers')}
-                style={{
-                  width: '100%', padding: '12px 0',
-                  background: '#fff', color: '#2563eb',
-                  border: '2px solid #2563eb', borderRadius: 12,
-                  fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                }}>
-                🎁 支援プランを見る
-              </button>
-
-              {/* シェアボタン */}
+              <button onClick={() => setActiveTab('tiers')} disabled={ended} style={{
+                width: '100%', padding: '16px 0', marginBottom: 12,
+                background: ended ? '#94a3b8' : 'linear-gradient(135deg, #d4af37, #f5d060)',
+                color: ended ? '#fff' : '#1a2e4a',
+                border: 'none', borderRadius: 12, fontWeight: 900, fontSize: 17,
+                cursor: ended ? 'not-allowed' : 'pointer',
+                boxShadow: ended ? 'none' : '0 6px 20px rgba(212,175,55,0.45)',
+                letterSpacing: '0.03em',
+              }}>{ended ? '募集終了' : '⭐ 今すぐ支援する'}</button>
+              <button onClick={() => setActiveTab('tiers')} style={{
+                width: '100%', padding: '12px 0',
+                background: '#fff', color: '#2563eb',
+                border: '2px solid #2563eb', borderRadius: 12,
+                fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              }}>💎 支援プランを見る</button>
               <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                 <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10, textAlign: 'center', fontWeight: 600 }}>シェアして応援！</p>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                  <button onClick={copyUrl}
-                    style={{ padding: '8px 16px', background: copied ? '#059669' : '#f1f5f9', color: copied ? '#fff' : '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  <button onClick={copyUrl} style={{ padding: '8px 16px', background: copied ? '#059669' : '#f1f5f9', color: copied ? '#fff' : '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
                     {copied ? '✅' : '🔗'} コピー
                   </button>
                   <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(project.title)}`}
