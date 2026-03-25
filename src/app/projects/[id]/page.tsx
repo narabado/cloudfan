@@ -120,6 +120,7 @@ export default function ProjectDetail() {
         .from('supporters')
         .select('*')
         .eq('project_id', Number(id))
+        .in('status', ['approved', '承認', '承認済み'])
         .order('created_at', { ascending: false });
 
       if (sErr) console.error('supporters fetch error:', sErr.message);
@@ -596,3 +597,5 @@ export default function ProjectDetail() {
     </>
   );
 }
+
+
