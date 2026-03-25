@@ -22,6 +22,15 @@ const BLOCK_COLORS   = ['#e8f4fd', '#edfaf3', '#fdf8e8'];
 const BLOCK_BORDERS  = ['#2563eb', '#059669', '#d97706'];
 const BLOCK_TITLES   = ['第1ストーリーブロック', '第2ストーリーブロック', '第3ストーリーブロック'];
 
+function safeDeadline(raw: unknown): string {
+  if (!raw) return '';
+  const s = String(raw);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return '';
+}
+
 export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [form, setForm] = useState<ProjectFormData>({
     title: '', school: '', club: '', region: '', description: '',
@@ -36,7 +45,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [saving,  setSaving]  = useState(false);
   const [message, setMessage] = useState('');
 
-  // ✅ useRef をトップレベルで個別宣言（配列内NG）
   const heroInputRef = useRef<HTMLInputElement>(null);
   const blockRef0    = useRef<HTMLInputElement>(null);
   const blockRef1    = useRef<HTMLInputElement>(null);
@@ -44,6 +52,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const blockRefs    = [blockRef0, blockRef1, blockRef2] as const;
 
   useEffect(() => {
+    if (!projectId) return;
     (async () => {
       const { data } = await supabase
         .from('crowdfunding_projects')
@@ -52,10 +61,10 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         .single();
       if (!data) return;
 
-      const imgs: string[]    = Array.isArray(data.images) ? (data.images as string[]) : [];
-      const hero              = imgs[0] || '';
-      const storyImgs         = imgs.slice(1);
-      const parts: string[]   = (String(data.story || '')).split('---').map((s: string) => s.trim());
+      const imgs: string[]  = Array.isArray(data.images) ? (data.images as string[]) : [];
+      const hero            = imgs[0] || '';
+      const storyImgs       = imgs.slice(1);
+      const parts: string[] = (String(data.story || '')).split('---').map((s: string) => s.trim());
 
       setHeroImageUrl(hero);
       setForm({
@@ -65,7 +74,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         region:      String(data.region      || ''),
         description: String(data.description || ''),
         goal:        Number(data.goal)        || 0,
-        deadline:    data.deadline ? String(data.deadline).slice(0, 10) : '',
+        deadline:    safeDeadline(data.deadline),
         status:      String(data.status      || '募集中'),
         youtube_url: String(data.youtube_url || ''),
         storyBlocks: [0, 1, 2].map(i => ({
@@ -103,6 +112,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const handleSave = async () => {
     setSaving(true);
     setMessage('');
+
     const story  = form.storyBlocks.map(b => b.text.trim()).filter(Boolean).join('\n---\n');
     const images = [heroImageUrl, ...form.storyBlocks.map(b => b.imageUrl)].filter(Boolean);
 
@@ -120,15 +130,17 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         youtube_url: form.youtube_url || null,
         story,
         images,
-        updated_at:  new Date().toISOString(),
       })
       .eq('id', projectId);
 
-    setMessage(error ? '❌ 保存失敗: ' + error.message : '✅ 保存しました！');
     setSaving(false);
+    if (error) {
+      setMessage('❌ 保存失敗: ' + error.message);
+    } else {
+      setMessage('✅ 保存しました！');
+    }
   };
 
-  // ✅ as string / as number で型推論を補助
   const setStr = (key: keyof ProjectFormData, val: string) =>
     setForm(prev => ({ ...prev, [key]: val }));
   const setNum = (key: keyof ProjectFormData, val: number) =>
@@ -155,26 +167,33 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <div>
             <label style={labelStyle}>プロジェクト名</label>
-            <input style={field} value={form.title} onChange={e => setStr('title', e.target.value)} />
+            <input style={field} value={form.title}
+              onChange={e => setStr('title', e.target.value)} />
           </div>
           <div>
             <label style={labelStyle}>学校名</label>
-            <input style={field} value={form.school} onChange={e => setStr('school', e.target.value)} />
+            <input style={field} value={form.school}
+              onChange={e => setStr('school', e.target.value)} />
           </div>
           <div>
             <label style={labelStyle}>クラブ名</label>
-            <input style={field} value={form.club} onChange={e => setStr('club', e.target.value)} />
+            <input style={field} value={form.club}
+              onChange={e => setStr('club', e.target.value)} />
           </div>
           <div>
             <label style={labelStyle}>地域</label>
-            <input style={field} value={form.region} onChange={e => setStr('region', e.target.value)} />
+            <input style={field} value={form.region}
+              onChange={e => setStr('region', e.target.value)} />
           </div>
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>説明文</label>
-          <textarea style={{ ...field, minHeight: 80 }} value={form.description}
-            onChange={e => setStr('description', e.target.value)} />
+          <textarea
+            style={{ ...field, minHeight: 80 }}
+            value={form.description}
+            onChange={e => setStr('description', e.target.value)}
+          />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
@@ -185,25 +204,34 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           </div>
           <div>
             <label style={labelStyle}>締切日</label>
-            <input type="date" style={field} value={form.deadline}
-              onChange={e => setStr('deadline', e.target.value)} />
+            <input
+              type="date"
+              style={field}
+              value={form.deadline}
+              onChange={e => setStr('deadline', e.target.value)}
+            />
             {form.deadline && (
               <span style={{ fontSize: 12, color: '#059669', marginTop: 4, display: 'block' }}>
-                📅 {new Date(form.deadline).toLocaleDateString('ja-JP')} まで
+                📅 {new Date(form.deadline + 'T00:00:00').toLocaleDateString('ja-JP')} まで
               </span>
             )}
           </div>
           <div>
             <label style={labelStyle}>ステータス</label>
-            <select style={{ ...field, cursor: 'pointer' }} value={form.status}
-              onChange={e => setStr('status', e.target.value)}>
+            <select
+              style={{ ...field, cursor: 'pointer' }}
+              value={form.status}
+              onChange={e => setStr('status', e.target.value)}
+            >
               {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <span style={{
               display: 'inline-block', marginTop: 4, padding: '2px 10px',
               borderRadius: 12, fontSize: 12, fontWeight: 700,
-              background: form.status === '募集中' ? '#dcfce7' : form.status === '終了' ? '#fee2e2' : '#fef9c3',
-              color:      form.status === '募集中' ? '#166534' : form.status === '終了' ? '#991b1b' : '#854d0e',
+              background: form.status === '募集中' ? '#dcfce7'
+                        : form.status === '終了'   ? '#fee2e2' : '#fef9c3',
+              color:      form.status === '募集中' ? '#166534'
+                        : form.status === '終了'   ? '#991b1b' : '#854d0e',
             }}>
               現在: {form.status}
             </span>
@@ -212,61 +240,106 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
 
         <div style={{ marginTop: 16 }}>
           <label style={labelStyle}>YouTube URL（任意）</label>
-          <input style={field} value={form.youtube_url}
+          <input
+            style={field}
+            value={form.youtube_url}
             onChange={e => setStr('youtube_url', e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..." />
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
         </div>
       </section>
 
       {/* ヒーロー画像 */}
-      <section style={{ marginBottom: 32, padding: 20, background: '#f0f4ff', borderRadius: 12, border: '2px dashed #2563eb' }}>
+      <section style={{
+        marginBottom: 32, padding: 20,
+        background: '#f0f4ff', borderRadius: 12,
+        border: '2px dashed #2563eb',
+      }}>
         <h3 style={{ color: '#1a2e4a', marginBottom: 12 }}>🖼 メイン画像（ヒーロー）</h3>
         {heroImageUrl && (
-          <img src={heroImageUrl} alt="hero"
-            style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, marginBottom: 12 }} />
+          <img
+            src={heroImageUrl} alt="hero"
+            style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, marginBottom: 12 }}
+          />
         )}
-        <input ref={heroInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-          onChange={e => { if (e.target.files?.[0]) uploadHero(e.target.files[0]); }} />
-        <button onClick={() => heroInputRef.current?.click()}
-          style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
+        <input
+          ref={heroInputRef} type="file" accept="image/*"
+          style={{ display: 'none' }}
+          onChange={e => { if (e.target.files?.[0]) uploadHero(e.target.files[0]); }}
+        />
+        <button
+          onClick={() => heroInputRef.current?.click()}
+          style={{
+            padding: '10px 24px', background: '#2563eb', color: '#fff',
+            border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700,
+          }}>
           📷 メイン画像を選択
         </button>
       </section>
 
-      {/* ストーリーブロック */}
+      {/* ストーリーブロック × 3 */}
       <section style={{ marginBottom: 32 }}>
         <h3 style={{ color: '#1a2e4a', marginBottom: 8 }}>📖 ストーリー（3ブロック）</h3>
         <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
           ※ 各ブロックに<strong>文章と写真をセット</strong>で入力してください。
         </p>
+
         {form.storyBlocks.map((block, i) => (
-          <div key={i} style={{ marginBottom: 24, padding: 20, background: BLOCK_COLORS[i], borderRadius: 12, border: `2px solid ${BLOCK_BORDERS[i]}` }}>
+          <div key={i} style={{
+            marginBottom: 24, padding: 20,
+            background: BLOCK_COLORS[i], borderRadius: 12,
+            border: `2px solid ${BLOCK_BORDERS[i]}`,
+          }}>
             <h4 style={{ margin: '0 0 14px', color: BLOCK_BORDERS[i], fontSize: 15 }}>
               {['①', '②', '③'][i]} {BLOCK_TITLES[i]}
             </h4>
+
             <div style={{ marginBottom: 12 }}>
               <label style={{ ...labelStyle, color: BLOCK_BORDERS[i] }}>📝 文章</label>
-              <textarea style={{ ...field, minHeight: 120, borderColor: BLOCK_BORDERS[i] }}
+              <textarea
+                style={{ ...field, minHeight: 120, borderColor: BLOCK_BORDERS[i] }}
                 value={block.text}
                 onChange={e => updateBlock(i, 'text', e.target.value)}
-                placeholder={`ブロック${i + 1}のストーリーを入力`} />
+                placeholder={`ブロック${i + 1}のストーリーを入力`}
+              />
             </div>
+
             <div>
               <label style={{ ...labelStyle, color: BLOCK_BORDERS[i] }}>📸 写真（必須）</label>
               {block.imageUrl && (
                 <div style={{ marginBottom: 8 }}>
-                  <img src={block.imageUrl} alt={`block${i}`}
-                    style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `2px solid ${BLOCK_BORDERS[i]}` }} />
-                  <button onClick={() => updateBlock(i, 'imageUrl', '')}
-                    style={{ marginTop: 4, padding: '4px 12px', background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  <img
+                    src={block.imageUrl} alt={`block${i}`}
+                    style={{
+                      width: '100%', maxHeight: 180, objectFit: 'cover',
+                      borderRadius: 8, border: `2px solid ${BLOCK_BORDERS[i]}`,
+                    }}
+                  />
+                  <button
+                    onClick={() => updateBlock(i, 'imageUrl', '')}
+                    style={{
+                      marginTop: 4, padding: '4px 12px',
+                      background: '#fee2e2', color: '#991b1b',
+                      border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                    }}>
                     🗑 削除
                   </button>
                 </div>
               )}
-              <input ref={blockRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={e => { if (e.target.files?.[0]) uploadBlock(e.target.files[0], i); }} />
-              <button onClick={() => blockRefs[i].current?.click()}
-                style={{ padding: '8px 20px', background: block.imageUrl ? '#f1f5f9' : BLOCK_BORDERS[i], color: block.imageUrl ? '#475569' : '#fff', border: `2px solid ${BLOCK_BORDERS[i]}`, borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+              <input
+                ref={blockRefs[i]} type="file" accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => { if (e.target.files?.[0]) uploadBlock(e.target.files[0], i); }}
+              />
+              <button
+                onClick={() => blockRefs[i].current?.click()}
+                style={{
+                  padding: '8px 20px',
+                  background: block.imageUrl ? '#f1f5f9' : BLOCK_BORDERS[i],
+                  color: block.imageUrl ? '#475569' : '#fff',
+                  border: `2px solid ${BLOCK_BORDERS[i]}`,
+                  borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                }}>
                 {block.imageUrl ? '🔄 写真を変更' : '📷 写真を選択'}
               </button>
               {block.text && !block.imageUrl && (
@@ -279,15 +352,28 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         ))}
       </section>
 
-      {/* 保存 */}
+      {/* 保存ボタン */}
       <div style={{ textAlign: 'center' }}>
         {message && (
-          <div style={{ padding: '12px 24px', marginBottom: 16, borderRadius: 8, background: message.startsWith('✅') ? '#dcfce7' : '#fee2e2', color: message.startsWith('✅') ? '#166534' : '#991b1b', fontWeight: 700 }}>
+          <div style={{
+            padding: '12px 24px', marginBottom: 16, borderRadius: 8,
+            background: message.startsWith('✅') ? '#dcfce7' : '#fee2e2',
+            color:      message.startsWith('✅') ? '#166534' : '#991b1b',
+            fontWeight: 700,
+          }}>
             {message}
           </div>
         )}
-        <button onClick={handleSave} disabled={saving}
-          style={{ padding: '14px 48px', background: saving ? '#94a3b8' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            padding: '14px 48px',
+            background: saving ? '#94a3b8' : '#1a2e4a',
+            color: '#fff', border: 'none', borderRadius: 10,
+            fontSize: 16, fontWeight: 700,
+            cursor: saving ? 'not-allowed' : 'pointer',
+          }}>
           {saving ? '保存中…' : '💾 保存する'}
         </button>
       </div>
