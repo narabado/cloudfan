@@ -5,15 +5,22 @@ import { supabase } from '@/lib/supabase';
 interface StoryBlock { text: string; imageUrl: string; }
 
 interface ProjectFormData {
-  title: string; school: string; club: string; region: string;
-  description: string; goal: number; deadline: string; status: string;
-  youtube_url: string; storyBlocks: StoryBlock[];
+  title: string;
+  school: string;
+  club: string;
+  region: string;
+  description: string;
+  goal: number;
+  deadline: string;
+  status: string;
+  youtube_url: string;
+  storyBlocks: StoryBlock[];
 }
 
 const STATUS_OPTIONS = ['募集中', '終了', '準備中', '達成'];
-const BLOCK_COLORS  = ['#e8f4fd', '#edfaf3', '#fdf8e8'];
-const BLOCK_BORDERS = ['#2563eb', '#059669', '#d97706'];
-const BLOCK_TITLES  = ['第1ストーリーブロック', '第2ストーリーブロック', '第3ストーリーブロック'];
+const BLOCK_COLORS   = ['#e8f4fd', '#edfaf3', '#fdf8e8'];
+const BLOCK_BORDERS  = ['#2563eb', '#059669', '#d97706'];
+const BLOCK_TITLES   = ['第1ストーリーブロック', '第2ストーリーブロック', '第3ストーリーブロック'];
 
 export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [form, setForm] = useState<ProjectFormData>({
@@ -26,17 +33,16 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     ],
   });
   const [heroImageUrl, setHeroImageUrl] = useState('');
-  const [saving, setSaving]   = useState(false);
+  const [saving,  setSaving]  = useState(false);
   const [message, setMessage] = useState('');
 
-  // ✅ useRef をトップレベルで3つ個別に宣言（配列内NG）
-  const heroInputRef   = useRef<HTMLInputElement>(null);
-  const blockRef0      = useRef<HTMLInputElement>(null);
-  const blockRef1      = useRef<HTMLInputElement>(null);
-  const blockRef2      = useRef<HTMLInputElement>(null);
-  const blockRefs      = [blockRef0, blockRef1, blockRef2];
+  // ✅ useRef をトップレベルで個別宣言（配列内NG）
+  const heroInputRef = useRef<HTMLInputElement>(null);
+  const blockRef0    = useRef<HTMLInputElement>(null);
+  const blockRef1    = useRef<HTMLInputElement>(null);
+  const blockRef2    = useRef<HTMLInputElement>(null);
+  const blockRefs    = [blockRef0, blockRef1, blockRef2] as const;
 
-  // ── 初期ロード ──────────────────────────────────────
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -46,22 +52,22 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         .single();
       if (!data) return;
 
-      const imgs: string[] = Array.isArray(data.images) ? data.images : [];
-      const hero = imgs[0] || '';
-      const storyImgs = imgs.slice(1);
-      const parts = (data.story || '').split('---').map((s: string) => s.trim());
+      const imgs: string[]    = Array.isArray(data.images) ? (data.images as string[]) : [];
+      const hero              = imgs[0] || '';
+      const storyImgs         = imgs.slice(1);
+      const parts: string[]   = (String(data.story || '')).split('---').map((s: string) => s.trim());
 
       setHeroImageUrl(hero);
       setForm({
-        title:       data.title       || '',
-        school:      data.school      || '',
-        club:        data.club        || '',
-        region:      data.region      || '',
-        description: data.description || '',
-        goal:        Number(data.goal) || 0,
+        title:       String(data.title       || ''),
+        school:      String(data.school      || ''),
+        club:        String(data.club        || ''),
+        region:      String(data.region      || ''),
+        description: String(data.description || ''),
+        goal:        Number(data.goal)        || 0,
         deadline:    data.deadline ? String(data.deadline).slice(0, 10) : '',
-        status:      data.status      || '募集中',
-        youtube_url: data.youtube_url || '',
+        status:      String(data.status      || '募集中'),
+        youtube_url: String(data.youtube_url || ''),
         storyBlocks: [0, 1, 2].map(i => ({
           text:     parts[i]     || '',
           imageUrl: storyImgs[i] || '',
@@ -70,7 +76,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     })();
   }, [projectId]);
 
-  // ── 画像アップロード ─────────────────────────────────
   const uploadHero = async (file: File) => {
     const path = `projects/${Date.now()}-hero-${file.name}`;
     const { error } = await supabase.storage.from('images').upload(path, file, { upsert: true });
@@ -95,11 +100,9 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     });
   };
 
-  // ── 保存 ──────────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true);
     setMessage('');
-
     const story  = form.storyBlocks.map(b => b.text.trim()).filter(Boolean).join('\n---\n');
     const images = [heroImageUrl, ...form.storyBlocks.map(b => b.imageUrl)].filter(Boolean);
 
@@ -112,8 +115,8 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         region:      form.region,
         description: form.description,
         goal:        Number(form.goal),
-        deadline:    form.deadline || null,   // 空なら null
-        status:      form.status,             // ← 確実に上書き
+        deadline:    form.deadline || null,
+        status:      form.status,
         youtube_url: form.youtube_url || null,
         story,
         images,
@@ -125,19 +128,19 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setSaving(false);
   };
 
-  const setField = <K extends keyof ProjectFormData>(key: K, val: ProjectFormData[K]) => {
+  // ✅ as string / as number で型推論を補助
+  const setStr = (key: keyof ProjectFormData, val: string) =>
     setForm(prev => ({ ...prev, [key]: val }));
-  };
+  const setNum = (key: keyof ProjectFormData, val: number) =>
+    setForm(prev => ({ ...prev, [key]: val }));
 
-  // ── スタイル ──────────────────────────────────────────
   const field: React.CSSProperties = {
     width: '100%', padding: '10px 12px', fontSize: 15,
     border: '1.5px solid #c8d6e5', borderRadius: 8,
     background: '#f8fbff', boxSizing: 'border-box',
   };
-  const label: React.CSSProperties = {
-    fontSize: 13, fontWeight: 700, color: '#1a2e4a',
-    display: 'block', marginBottom: 4,
+  const labelStyle: React.CSSProperties = {
+    fontSize: 13, fontWeight: 700, color: '#1a2e4a', display: 'block', marginBottom: 4,
   };
 
   return (
@@ -150,45 +153,50 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
       <section style={{ marginBottom: 32 }}>
         <h3 style={{ color: '#2563eb' }}>📋 基本情報</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-          {([['title','プロジェクト名'], ['school','学校名'], ['club','クラブ名'], ['region','地域']] as const).map(([k, lbl]) => (
-            <div key={k}>
-              <label style={label}>{lbl}</label>
-              <input style={field} value={form[k]} onChange={e => setField(k, e.target.value)} />
-            </div>
-          ))}
+          <div>
+            <label style={labelStyle}>プロジェクト名</label>
+            <input style={field} value={form.title} onChange={e => setStr('title', e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>学校名</label>
+            <input style={field} value={form.school} onChange={e => setStr('school', e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>クラブ名</label>
+            <input style={field} value={form.club} onChange={e => setStr('club', e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>地域</label>
+            <input style={field} value={form.region} onChange={e => setStr('region', e.target.value)} />
+          </div>
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={label}>説明文</label>
+          <label style={labelStyle}>説明文</label>
           <textarea style={{ ...field, minHeight: 80 }} value={form.description}
-            onChange={e => setField('description', e.target.value)} />
+            onChange={e => setStr('description', e.target.value)} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
           <div>
-            <label style={label}>目標金額（円）</label>
+            <label style={labelStyle}>目標金額（円）</label>
             <input type="number" style={field} value={form.goal}
-              onChange={e => setField('goal', Number(e.target.value))} />
+              onChange={e => setNum('goal', Number(e.target.value))} />
           </div>
-
-          {/* 締切日 */}
           <div>
-            <label style={label}>締切日</label>
+            <label style={labelStyle}>締切日</label>
             <input type="date" style={field} value={form.deadline}
-              onChange={e => setField('deadline', e.target.value)} />
+              onChange={e => setStr('deadline', e.target.value)} />
             {form.deadline && (
               <span style={{ fontSize: 12, color: '#059669', marginTop: 4, display: 'block' }}>
                 📅 {new Date(form.deadline).toLocaleDateString('ja-JP')} まで
               </span>
             )}
           </div>
-
-          {/* ステータス（controlled） */}
           <div>
-            <label style={label}>ステータス</label>
-            <select style={{ ...field, cursor: 'pointer' }}
-              value={form.status}
-              onChange={e => setField('status', e.target.value)}>
+            <label style={labelStyle}>ステータス</label>
+            <select style={{ ...field, cursor: 'pointer' }} value={form.status}
+              onChange={e => setStr('status', e.target.value)}>
               {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <span style={{
@@ -203,9 +211,9 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <label style={label}>YouTube URL（任意）</label>
+          <label style={labelStyle}>YouTube URL（任意）</label>
           <input style={field} value={form.youtube_url}
-            onChange={e => setField('youtube_url', e.target.value)}
+            onChange={e => setStr('youtube_url', e.target.value)}
             placeholder="https://www.youtube.com/watch?v=..." />
         </div>
       </section>
@@ -231,23 +239,20 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
           ※ 各ブロックに<strong>文章と写真をセット</strong>で入力してください。
         </p>
-
         {form.storyBlocks.map((block, i) => (
           <div key={i} style={{ marginBottom: 24, padding: 20, background: BLOCK_COLORS[i], borderRadius: 12, border: `2px solid ${BLOCK_BORDERS[i]}` }}>
             <h4 style={{ margin: '0 0 14px', color: BLOCK_BORDERS[i], fontSize: 15 }}>
               {['①', '②', '③'][i]} {BLOCK_TITLES[i]}
             </h4>
-
             <div style={{ marginBottom: 12 }}>
-              <label style={{ ...label, color: BLOCK_BORDERS[i] }}>📝 文章</label>
+              <label style={{ ...labelStyle, color: BLOCK_BORDERS[i] }}>📝 文章</label>
               <textarea style={{ ...field, minHeight: 120, borderColor: BLOCK_BORDERS[i] }}
                 value={block.text}
                 onChange={e => updateBlock(i, 'text', e.target.value)}
                 placeholder={`ブロック${i + 1}のストーリーを入力`} />
             </div>
-
             <div>
-              <label style={{ ...label, color: BLOCK_BORDERS[i] }}>📸 写真（必須）</label>
+              <label style={{ ...labelStyle, color: BLOCK_BORDERS[i] }}>📸 写真（必須）</label>
               {block.imageUrl && (
                 <div style={{ marginBottom: 8 }}>
                   <img src={block.imageUrl} alt={`block${i}`}
