@@ -51,7 +51,7 @@ export default function SupportPage() {
     (async () => {
       const { data: proj } = await supabase
         .from('crowdfunding_projects')
-        .select('id,title,school,club,region,goal_amount,deadline,status')
+        .select('id,title,school,club,region,goal_amount,deadline,status,tiers')
         .eq('id', id)
         .single();
       if (proj) setProject(proj as unknown as Project);
@@ -62,28 +62,28 @@ export default function SupportPage() {
         .eq('project_id', id)
         .order('amount', { ascending: true });
 
-      const tierList = (tierRows ?? []) as unknown as Tier[];
-      setTiers(tierList);
-
+      let finalTierList = (tierRows ?? []) as unknown as Tier[];
+      // project_tiers が空なら project.tiers JSON にフォールバック
+      if (finalTierList.length === 0 && proj) {
+        const jsonTiers = (proj as any).tiers;
+        if (Array.isArray(jsonTiers)) {
+          finalTierList = jsonTiers.map((t: any, i: number) => ({ ...t, id: t.id ?? String(i) }));
+        }
+      }
+      setTiers(finalTierList);
       const tierIdParam = searchParams.get('tier');
       if (tierIdParam) {
-        const found = tierList.find(t => String(t.id) === tierIdParam);
-        if (found) setSelTier(found);
-      } else if (tierList.length > 0) {
-        setSelTier(tierList[0]);
+        const found = finalTierList.find((t: any) => String(t.id) === tierIdParam);
+        if (found) { setSelTier(found); }
+        else {
+          // インデックスフォールバック（tier=0,1,2 の場合）
+          const idx = parseInt(tierIdParam, 10);
+          if (!isNaN(idx) && finalTierList[idx]) setSelTier(finalTierList[idx]);
+          else if (finalTierList.length > 0) setSelTier(finalTierList[0]);
+        }
+      } else if (finalTierList.length > 0) {
+        setSelTier(finalTierList[0]);
       }
-
-      setLoading(false);
-    })();
-  }, [id, searchParams]);
-
-  const totalAmount = selTier ? selTier.amount * qty : 0;
-
-  const validate = () => {
-    if (!name.trim())  { setError('お名前を入力してください'); return false; }
-    if (!email.trim() || !email.includes('@')) { setError('正しいメールアドレスを入力してください'); return false; }
-    if (!selTier)      { setError('支援プランを選択してください'); return false; }
-    if (qty < 1)       { setError('口数は1以上を選択してください'); return false; }
     setError('');
     return true;
   };

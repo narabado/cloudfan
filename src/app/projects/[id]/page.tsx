@@ -77,7 +77,7 @@ function isEnded(status: string): boolean {
 }
 
 function getYouTubeId(url: string): string | null {
-  const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
@@ -151,7 +151,7 @@ export default function ProjectDetail() {
         .from('supporters')
         .select('*')
         .eq('project_id', Number(id))
-        .in('status', ['approved', 'active'])
+        .eq('status', 'approved')
         .order('created_at', { ascending: false });
 
       if (supRows) {
