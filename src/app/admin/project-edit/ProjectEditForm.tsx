@@ -151,7 +151,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         region: project.region,
         description: project.description,
         goal: project.goal,
-        deadline: project.deadline,
         youtube_url: project.youtube_url,
         status: project.status,
         story: JSON.stringify(blocks),
@@ -395,6 +394,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     </div>
   );
 }
+
 
 
 
