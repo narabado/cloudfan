@@ -58,32 +58,33 @@ function fmt(n: number): string {
 // =============================================
 export default function TopPage() {
   const router = useRouter();
-  const [projects, setProjects]     = useState<Project[]>([]);
+  const [projects, setProjects]         = useState<Project[]>([]);
   const [supporterMap, setSupporterMap] = useState<Record<number, { total: number; count: number }>>({});
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading]           = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // プロジェクト取得
+        // ✅ 'active' と '募集中' 両方を取得
         const { data: pData, error: pErr } = await supabase
           .from('crowdfunding_projects')
           .select('*')
-          .eq('status', '募集中')
+          .in('status', ['募集中', 'active'])
           .order('id', { ascending: true });
         if (pErr) console.error('projects error:', pErr);
 
-        // 支援者取得（全件・amount カラム使用）
+        // ✅ total_amount カラムを使用
         const { data: sData, error: sErr } = await supabase
           .from('supporters')
-          .select('project_id, amount');
+          .select('project_id, total_amount');
         if (sErr) console.error('supporters error:', sErr);
 
         const map: Record<number, { total: number; count: number }> = {};
         (sData ?? []).forEach((s: any) => {
           const pid = Number(s.project_id);
           if (!map[pid]) map[pid] = { total: 0, count: 0 };
-          map[pid].total += Number(s.amount) || 0;
+          // ✅ total_amount で集計
+          map[pid].total += Number(s['total_amount']) || 0;
           map[pid].count += 1;
         });
 
@@ -120,7 +121,7 @@ export default function TopPage() {
           onClick={() => router.push('/')}>
           <img
             src="/logo.png"
-            alt="ならバド"
+            alt="CloudFan"
             style={{ height: 36 }}
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
@@ -160,7 +161,6 @@ export default function TopPage() {
       color: '#fff', padding: '80px 24px 72px', textAlign: 'center',
       position: 'relative', overflow: 'hidden',
     }}>
-      {/* 背景装飾 */}
       <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300,
         background: 'rgba(255,255,255,0.03)', borderRadius: '50%' }} />
       <div style={{ position: 'absolute', bottom: -80, left: -40, width: 400, height: 400,
@@ -293,7 +293,6 @@ export default function TopPage() {
 
         {/* カード本文 */}
         <div style={{ padding: '18px 20px 20px' }}>
-          {/* 進捗 */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'baseline' }}>
               <span style={{ fontSize: 22, fontWeight: 900, color: '#1a2e4a' }}>¥{fmt(stats.total)}</span>
@@ -313,14 +312,12 @@ export default function TopPage() {
             </div>
           </div>
 
-          {/* 説明 */}
           <p style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.7, marginBottom: 16,
             display: '-webkit-box', WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {project.description}
           </p>
 
-          {/* ボタン */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <button
               onClick={() => router.push(`/projects/${project.id}`)}
@@ -356,10 +353,10 @@ export default function TopPage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 20 }}>
           {[
-            { icon: '✈️', title: '遠征・交通費',     desc: '道外・道内大会への遠征費用を支援' },
+            { icon: '✈️', title: '遠征・交通費',      desc: '道外・道内大会への遠征費用を支援' },
             { icon: '🏸', title: '用具・ユニフォーム', desc: 'ラケット・シューズ・ウェアの購入支援' },
-            { icon: '🏆', title: '大会参加費',         desc: '全道・全国大会への出場費用を支援' },
-            { icon: '🏟️', title: '練習環境の整備',    desc: '体育館・練習設備の改善を支援' },
+            { icon: '🏆', title: '大会参加費',          desc: '全道・全国大会への出場費用を支援' },
+            { icon: '🏟️', title: '練習環境の整備',     desc: '体育館・練習設備の改善を支援' },
           ].map((f) => (
             <div key={f.title} style={{ background: '#fff', borderRadius: 14,
               padding: '24px 20px', textAlign: 'center',
@@ -415,7 +412,7 @@ export default function TopPage() {
         flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <img src="/logo.png" alt="ならバド" style={{ height: 28 }}
+            <img src="/logo.png" alt="CloudFan" style={{ height: 28 }}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
             <span style={{ fontSize: 20, fontWeight: 800 }}>CloudFan</span>
           </div>
@@ -442,7 +439,6 @@ export default function TopPage() {
   // ── レンダリング ──
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif" }}>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" />
       <NavBar />
       <Hero />
       <StatsBar />
