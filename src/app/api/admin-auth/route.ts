@@ -1,15 +1,10 @@
 ﻿import { NextResponse } from "next/server";
-const ADMIN_PASSWORD = "NBD3890";
-$routeFile = "C:\Users\user\Desktop\sports-support-hokkaido\src\app\api\admin-auth\route.ts"
-$routeContent = @'
-import { NextResponse } from "next/server";
 
 const ADMIN_PASSWORD = "NBD3890";
 
 export async function POST(request: Request) {
   try {
     const { password } = await request.json();
-
     if (password === ADMIN_PASSWORD) {
       const response = NextResponse.json({ ok: true });
       response.cookies.set("admin_auth", "NBD3890", {
@@ -21,7 +16,6 @@ export async function POST(request: Request) {
       });
       return response;
     }
-
     return NextResponse.json({ ok: false }, { status: 401 });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
