@@ -58,7 +58,7 @@ export default function TopPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const totalAmount = projects.reduce((s, p) => s + (p.current_amount ?? 0), 0);
+  const totalAmount = projects.reduce((s, p) => s + (Number(p.current_amount) || 0), 0);
   const totalSupporters = Object.values(supporterCounts).reduce((s, v) => s + v, 0);
   const minDays = projects.length > 0
     ? Math.min(...projects.map((p) => calcDaysLeft(p.deadline)))
@@ -66,7 +66,7 @@ export default function TopPage() {
 
   if (showSplash) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#1a2e4a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '24px' }}>
-      <img src="/narabad-logo.png" alt="ならバド" style={{ width: '180px', height: 'auto' }} />
+      <img src="/logo.png" alt="CloudFan" style={{ width: '180px', height: 'auto' }} />
       <p style={{ color: '#4fc3f7', fontSize: '18px', letterSpacing: '0.1em', fontWeight: 'bold' }}>読み込み中...</p>
     </div>
   );
@@ -86,7 +86,7 @@ export default function TopPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
             onClick={() => router.push('/')}>
-            <img src="/narabad-logo.png" alt="CloudFan" style={{ height: 36 }}
+            <img src="/logo.png" alt="CloudFan" style={{ height: 36 }}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
             <span style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>CloudFan</span>
           </div>
