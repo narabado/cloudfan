@@ -71,9 +71,9 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const fetchProject = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('projects')
+      .from('crowdfunding_projects')
       .select('*')
-      .eq('id', projectId)
+      .eq('id', Number(projectId))
       .single();
 
     if (error) {
@@ -143,7 +143,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setMessage('');
 
     const { error } = await supabase
-      .from('projects')
+      .from('crowdfunding_projects')
       .update({
         title: project.title,
         school: project.school,
@@ -156,7 +156,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         status: project.status,
         story_blocks: blocks,
       })
-      .eq('id', projectId);
+      .eq('id', Number(projectId));
 
     setSaving(false);
 
@@ -394,3 +394,5 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     </div>
   );
 }
+
+
