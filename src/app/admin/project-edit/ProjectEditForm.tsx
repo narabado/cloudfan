@@ -154,7 +154,8 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         deadline: project.deadline,
         youtube_url: project.youtube_url,
         status: project.status,
-        story_blocks: blocks,
+        story: JSON.stringify(blocks),
+        deadline: project.deadline && /^\d{4}-\d{2}-\d{2}$/.test(project.deadline) ? project.deadline : null,
       })
       .eq('id', Number(projectId));
 
@@ -394,6 +395,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     </div>
   );
 }
+
 
 
 
