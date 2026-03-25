@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     const { password } = await request.json();
     if (password === ADMIN_PASSWORD) {
       const response = NextResponse.json({ ok: true });
-      response.cookies.set("admin_auth", "NBD3890", {
+      response.cookies.set("admin_auth", ADMIN_PASSWORD, {
         httpOnly: true,
         secure: true,
         maxAge: 60 * 60 * 24,
