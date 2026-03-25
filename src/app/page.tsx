@@ -40,7 +40,7 @@ export default function TopPage() {
       const { data: pData } = await supabase
         .from('crowdfunding_projects')
         .select('*')
-        .in('status', ['approved', 'active', '募集中'])
+        .in('status', ['approved', 'active'])
         .order('created_at', { ascending: false });
       setProjects(pData ?? []);
 
@@ -49,7 +49,7 @@ export default function TopPage() {
         .select('project_id, status');
       const counts: Record<number, number> = {};
       (sData ?? []).forEach((s: { project_id: number; status: string }) => {
-        const approved = ['approved', '承認', '承認済み'].includes(s.status);
+        const approved = ['approved', 'pending', 'active'].includes(s.status);
         if (approved) counts[s.project_id] = (counts[s.project_id] ?? 0) + 1;
       });
       setSupporterCounts(counts);
