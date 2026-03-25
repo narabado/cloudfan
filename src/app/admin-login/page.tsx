@@ -24,10 +24,10 @@ export default function AdminLoginPage() {
         router.push("/admin");
         router.refresh();
       } else {
-        setError("パスワードが違います");
+        setError("繝代せ繝ｯ繝ｼ繝峨′驕輔＞縺ｾ縺・);
       }
     } catch {
-      setError("エラーが発生しました");
+      setError("繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆");
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export default function AdminLoginPage() {
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 48, marginBottom: 8 }}>🔐</div>
+        <div style={{ fontSize: 48, marginBottom: 8 }}>柏</div>
         <h1
           style={{
             fontSize: 22,
@@ -62,19 +62,19 @@ export default function AdminLoginPage() {
             color: "#1e3a5f",
           }}
         >
-          管理者ページ
+          邂｡逅・・・繝ｼ繧ｸ
         </h1>
         <p
           style={{ color: "#6b7280", fontSize: 13, marginBottom: 28 }}
         >
-          パスワードを入力してください
+          繝代せ繝ｯ繝ｼ繝峨ｒ蜈･蜉帙＠縺ｦ縺上□縺輔＞
         </p>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-          placeholder="パスワード"
+          placeholder="繝代せ繝ｯ繝ｼ繝・
           autoFocus
           style={{
             width: "100%",
@@ -109,7 +109,7 @@ export default function AdminLoginPage() {
             opacity: loading ? 0.7 : 1,
           }}
         >
-          {loading ? "確認中..." : "ログイン"}
+          {loading ? "遒ｺ隱堺ｸｭ..." : "繝ｭ繧ｰ繧､繝ｳ"}
         </button>
       </div>
     </div>
