@@ -24,8 +24,8 @@ function calcDaysLeft(deadline: string | null): number {
   return Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000));
 }
 
-function fmt(n: number): string {
-  return n.toLocaleString('ja-JP');
+function fmt(n: number | null | undefined): string {
+  return (Number(n) || 0).toLocaleString('ja-JP');
 }
 
 export default function TopPage() {
@@ -74,7 +74,6 @@ export default function TopPage() {
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif" }}>
 
-      {/* ナビゲーション */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: '#1a2e4a',
@@ -116,7 +115,6 @@ export default function TopPage() {
         </div>
       </nav>
 
-      {/* ヒーロー */}
       <div style={{
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1a2e4a 40%, #1e4d8c 70%, #2563eb 100%)',
         color: '#fff', padding: '80px 24px 72px', textAlign: 'center',
@@ -170,14 +168,13 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* 統計バー */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, textAlign: 'center' }}>
           {[
-            { label: '累積支援額',         value: '¥' + fmt(totalAmount),          icon: '💰' },
-            { label: '支援者数',           value: fmt(totalSupporters) + '名',       icon: '👥' },
-            { label: '募集中プロジェクト', value: projects.length + '件',            icon: '🏆' },
+            { label: '累積支援額',         value: '¥' + fmt(totalAmount),               icon: '💰' },
+            { label: '支援者数',           value: fmt(totalSupporters) + '名',            icon: '👥' },
+            { label: '募集中プロジェクト', value: projects.length + '件',                 icon: '🏆' },
             { label: '最短残り日数',       value: minDays !== null ? minDays + '日' : '—', icon: '⏰' },
           ].map((s) => (
             <div key={s.label} style={{ padding: '8px 0' }}>
@@ -191,7 +188,6 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* プロジェクト一覧 */}
       <div id="projects" style={{ padding: '64px 24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#1a2e4a', marginBottom: 8 }}>
@@ -211,8 +207,9 @@ export default function TopPage() {
           <div style={{ display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 28 }}>
             {projects.map((p) => {
-              const pct = p.goal_amount > 0
-                ? Math.min(100, Math.round((p.current_amount / p.goal_amount) * 100)) : 0;
+              const pct = (Number(p.goal_amount) || 0) > 0
+                ? Math.min(100, Math.round((Number(p.current_amount) || 0) / (Number(p.goal_amount) || 1) * 100))
+                : 0;
               const daysLeft = calcDaysLeft(p.deadline);
               const count = supporterCounts[p.id] ?? 0;
               return (
@@ -228,7 +225,6 @@ export default function TopPage() {
                     (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
                     (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 16px rgba(0,0,0,0.08)';
                   }}>
-                  {/* カード画像 */}
                   <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: '#e2e8f0' }}>
                     {p.hero_image_url ? (
                       <img src={p.hero_image_url} alt={p.title}
@@ -259,7 +255,6 @@ export default function TopPage() {
                     </div>
                   </div>
 
-                  {/* カード本文 */}
                   <div style={{ padding: '18px 20px 20px' }}>
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'baseline' }}>
@@ -310,7 +305,6 @@ export default function TopPage() {
         )}
       </div>
 
-      {/* こんな活動を支援できます */}
       <div style={{ background: '#f0f4ff', padding: '56px 24px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -340,7 +334,6 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* 支援の流れ */}
       <div id="how-to" style={{ background: '#f9fafb', padding: '64px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <h2 style={{ textAlign: 'center', fontSize: 26, fontWeight: 800,
@@ -351,7 +344,7 @@ export default function TopPage() {
               { step: '01', icon: '🔍', title: 'プロジェクトを探す', desc: '支援したいチームを見つけましょう' },
               { step: '02', icon: '💰', title: '支援プランを選ぶ',   desc: '¥1,000〜好きな金額のプランを選択' },
               { step: '03', icon: '📝', title: 'フォームに入力',      desc: 'お名前とメールアドレスを入力' },
-              { step: '04', icon: '🎉', title: '支払いで支援完了',      desc: '支払いコードをメールで受け取り支払い' },
+              { step: '04', icon: '🎉', title: '支払いで支援完了',    desc: '支払いコードをメールで受け取り支払い' },
             ].map((s) => (
               <div key={s.step} style={{ background: '#fff', borderRadius: 14,
                 padding: 24, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -371,14 +364,13 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* フッター */}
       <footer style={{ background: '#1a2e4a', color: '#fff', padding: '36px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           flexWrap: 'wrap', gap: 16 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <img src="/narabad-logo.png" alt="CloudFan" style={{ height: 28 }}
+              <img src="/logo.png" alt="CloudFan" style={{ height: 28 }}
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
               <span style={{ fontSize: 20, fontWeight: 800 }}>CloudFan</span>
             </div>
