@@ -80,14 +80,13 @@ function parseStory(story: string | null): StoryBlock[] {
   try {
     const parsed = JSON.parse(story);
     if (Array.isArray(parsed)) {
-    return parsed.map((b: Record<string, any>) => ({
+      return parsed.map((b: Record<string, any>) => ({
         title:     String(b['title']     ?? ''),
         body:      String(b['body']      ?? b['text'] ?? ''),
         image_url: String(b['image_url'] ?? b['image'] ?? ''),
       }));
     }
   } catch {
-    // JSON でなければ --- 区切りとして処理
     return story.split('---').map((s, i) => ({
       title:     CHAPTER_TITLES[i] ?? `第${i + 1}章`,
       body:      s.trim(),
@@ -100,14 +99,14 @@ function parseStory(story: string | null): StoryBlock[] {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [project,      setProject]      = useState<Project | null>(null);
-  const [tiers,        setTiers]        = useState<Tier[]>([]);
-  const [supporters,   setSupporters]   = useState<Supporter[]>([]);
-  const [totalRaised,  setTotalRaised]  = useState(0);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState('');
-  const [activeTab,    setActiveTab]    = useState<'story' | 'tiers' | 'supporters' | 'ranking'>('story');
-  const [copied,       setCopied]       = useState(false);
+  const [project,     setProject]     = useState<Project | null>(null);
+  const [tiers,       setTiers]       = useState<Tier[]>([]);
+  const [supporters,  setSupporters]  = useState<Supporter[]>([]);
+  const [totalRaised, setTotalRaised] = useState(0);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
+  const [activeTab,   setActiveTab]   = useState<'story' | 'tiers' | 'supporters' | 'ranking'>('story');
+  const [copied,      setCopied]      = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -125,7 +124,6 @@ export default function ProjectDetail() {
       }
       setProject(proj as unknown as Project);
 
-      // tiers は crowdfunding_projects.tiers JSONB から直接取得
       const rawTiers = (proj as any)['tiers'];
       if (Array.isArray(rawTiers) && rawTiers.length > 0) {
         setTiers(rawTiers.map((t: Tier, i: number) => ({ ...t, id: t.id ?? String(i) })));
@@ -133,7 +131,7 @@ export default function ProjectDetail() {
       const { data: supRows } = await supabase
         .from('supporters')
         .select('*')
-        .eq('project_id', Number(id))
+        .eq('project_id', Number(id));
 
       if (supRows) {
         const rows = supRows as unknown as Supporter[];
@@ -167,7 +165,7 @@ export default function ProjectDetail() {
   const days        = calcDaysLeft(project.deadline);
   const statusBadge = getStatusBadge(project.status);
   const ended       = isEnded(project.status);
-  const goalAmount = Number((project as any)['goal'] ?? 0) || 0;
+  const goalAmount  = Number((project as any)['goal'] ?? 0) || 0;
   const progressPct = goalAmount > 0
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;
@@ -185,11 +183,6 @@ export default function ProjectDetail() {
     (a, b) => (Number(b['total_amount']) || 0) - (Number(a['total_amount']) || 0)
   );
   const rankMedals = ['🥇', '🥈', '🥉'];
-
-    if (!text) return;
-    setTierComments(prev => [{ tierId, name: '匿名', comment: text }, ...prev]);
-    setNewComment(prev => ({ ...prev, [tierId]: '' }));
-  };
 
   const copyUrl = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -367,7 +360,7 @@ export default function ProjectDetail() {
                     const c = tierColors[i] || '#1a56db';
                     const sCount = tierCount[tier.name] || 0;
                     const tierId = String(tier.id ?? i);
-                                    return (
+                    return (
                       <div key={tierId} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
                         <div style={{ background: c, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -392,23 +385,6 @@ export default function ProjectDetail() {
                               fontWeight: 800, fontSize: 15, cursor: ended ? 'not-allowed' : 'pointer',
                               boxShadow: ended ? 'none' : `0 4px 14px ${c}55`,
                             }}>{ended ? '募集終了' : `💎 ¥${(Number(tier.amount) || 0).toLocaleString()}で支援する`}</button>
-                          <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
-                            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8, fontWeight: 700 }}>💬 応援コメント ({comments.length})</p>
-                            {comments.map((cm, ci) => (
-                              <div key={ci} style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: 8, marginBottom: 8, fontSize: 13, color: '#334155' }}>
-                                <strong>{cm.name}</strong>: {cm.comment}
-                              </div>
-                            ))}
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <input value={newComment[tierId] || ''}
-                                onChange={e => setNewComment(p => ({ ...p, [tierId]: e.target.value }))}
-                                onKeyDown={e => { if (e.key === 'Enter') addComment(tierId); }}
-                                placeholder="応援メッセージを入力…"
-                                style={{ flex: 1, padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
-                              <button onClick={() => addComment(tierId)}
-                                style={{ padding: '9px 18px', background: c, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>送信</button>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     );
