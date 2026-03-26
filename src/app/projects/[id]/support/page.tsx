@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -324,7 +324,13 @@ export default function SupportPage() {
 
   async function handleSubmit() {
     setSubmitting(true); setError('');
-    const code = 'SP-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    // 既存支援者数を取得して連番コードを生成
+    const { count: existingCount } = await supabase
+      .from('supporters')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', id);
+    const nextNum = (existingCount ?? 0) + 1;
+    const code = String(nextNum).padStart(3, '0');
     const { error: err } = await supabase.from('supporters').insert({
       project_id: id, project_title: project?.title ?? '',
       name: isAnon ? '匿名' : name, email,
