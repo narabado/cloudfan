@@ -1,213 +1,214 @@
-import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-import { createClient } from '@supabase/supabase-js';
+﻿import { NextRequest, NextResponse } from "next/server";
+import nodemailer from "nodemailer";
+import { createClient } from "@supabase/supabase-js";
 
-const ADMIN_EMAIL = 'narabadocf@gmail.com';
+const ADMIN_EMAIL = "narabadocf@gmail.com";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// 振込コードを生成（RPCが失敗した場合はランダム3桁）
 async function generateTransferCode(): Promise<string> {
-  const { data, error } = await supabase.rpc('increment_transfer_counter');
+  const { data, error } = await supabase.rpc("increment_transfer_counter");
   if (error || !data) {
-    console.error('Counter error:', error);
+    console.error("Counter error:", error);
     const random = Math.floor(Math.random() * 900) + 100;
     return `CF${random}`;
   }
-  return `CF${String(data).padStart(4, '0')}`;
+  return `CF${String(data).padStart(4, "0")}`;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const {
-      supporterName,
-      supporterEmail,
-      tier,
-      units,
-      totalAmount,
-      message,
-      projectTitle,
-      projectId,       // ★ 追加：プロジェクトID
-    } = body;
+    const { supporterName, supporterEmail, tier, units, totalAmount, message, projectTitle, projectId } = body;
 
-    // 振込コード生成
     const transferCode = await generateTransferCode();
 
-    // Supabaseへ保存
-    const { error: insertError } = await supabase.from('supporters').insert({
-      project_id:    Number(projectId) || 1,   // ★ 追加
-      project_title: projectTitle || '',
+    const { error: insertError } = await supabase.from("supporters").insert({
+      project_id:    Number(projectId) || 1,
+      project_title: projectTitle || "",
       name:          supporterName,
       email:         supporterEmail,
       tier:          tier,
       units:         units,
       total_amount:  totalAmount,
       transfer_code: transferCode,
-      status:        'pending',
-      message:       message || '',
+      status:        "pending",
+      message:       message || "",
     });
 
     if (insertError) {
-      console.error('Insert error:', insertError);
-      return NextResponse.json({ error: 'DB保存に失敗しました' }, { status: 500 });
+      console.error("Insert error:", insertError);
+      return NextResponse.json({ error: "DB保存に失敗しました" }, { status: 500 });
     }
 
-    // 振込期限（14日後）
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + 14);
     const deadlineStr = `${deadline.getFullYear()}年${deadline.getMonth() + 1}月${deadline.getDate()}日`;
+    const deadlineDay = ["日","月","火","水","木","金","土"][deadline.getDay()];
+    const deadlineFull = `${deadlineStr}（${deadlineDay}）`;
+    const fmtAmt = (n: number) => `¥${Number(n).toLocaleString("ja-JP")}`;
 
-    // メール送信設定
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: ADMIN_EMAIL,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
+      service: "gmail",
+      auth: { user: ADMIN_EMAIL, pass: process.env.GMAIL_APP_PASSWORD },
     });
 
-    // 支援者へのメール
-    const supporterHtml = `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-        <h2 style="color:#1a3a5c;">ご支援ありがとうございます！</h2>
-        <p>${supporterName} 様</p>
-        <p>「${projectTitle}」へのご支援を受け付けました。<br>
-        以下の振込情報をご確認のうえ、期限内にお振り込みをお願いいたします。</p>
+    // ===== 支援者メール =====
+    const supporterHtml = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>ご支援ありがとうございます</title></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:30px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:600px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
 
-        <table style="border-collapse:collapse;width:100%;margin:20px 0;">
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">振込コード</td>
-            <td style="padding:10px;border:1px solid #ddd;font-size:1.4em;color:#e55;">${transferCode}</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">支援ティア</td>
-            <td style="padding:10px;border:1px solid #ddd;">${tier}</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">口数</td>
-            <td style="padding:10px;border:1px solid #ddd;">${units}口</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">振込金額</td>
-            <td style="padding:10px;border:1px solid #ddd;font-size:1.2em;color:#1a3a5c;font-weight:bold;">
-              ¥${Number(totalAmount).toLocaleString()}
-            </td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">振込期限</td>
-            <td style="padding:10px;border:1px solid #ddd;color:#e55;">${deadlineStr}まで</td>
-          </tr>
-        </table>
+  <tr><td style="background:linear-gradient(135deg,#1a2744 0%,#243660 100%);padding:36px 40px;text-align:center;">
+    <div style="font-size:11px;color:#c9a227;letter-spacing:4px;margin-bottom:6px;text-transform:uppercase;">BADMINTON SUPPORT HOKKAIDO</div>
+    <div style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:1px;">ご支援ありがとうございます</div>
+  </td></tr>
 
-        <h3 style="color:#1a3a5c;">振込先口座</h3>
-        <table style="border-collapse:collapse;width:100%;margin:20px 0;">
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">銀行名</td>
-            <td style="padding:10px;border:1px solid #ddd;">北洋銀行</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">支店名</td>
-            <td style="padding:10px;border:1px solid #ddd;">札幌支店</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">口座種別</td>
-            <td style="padding:10px;border:1px solid #ddd;">普通</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">口座番号</td>
-            <td style="padding:10px;border:1px solid #ddd;">1234567</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">口座名義</td>
-            <td style="padding:10px;border:1px solid #ddd;">ナラバ ドウシ</td>
-          </tr>
-        </table>
+  <tr><td style="padding:36px 40px 8px;">
+    <p style="font-size:17px;color:#1a2744;margin:0 0 6px;font-weight:bold;">${supporterName} 様</p>
+    <p style="font-size:14px;color:#555;margin:0 0 28px;line-height:1.8;">
+      『${projectTitle}』へのご支援、誠にありがとうございます。<br>
+      以下の振込情報をご確認のうえ、期限内にお振り込みをお願いいたします。
+    </p>
 
-        <p style="background:#fff3cd;padding:15px;border-radius:8px;">
-          ⚠️ 振込時は必ず振込コード <strong>${transferCode}</strong> をお名前欄に入力してください。
-        </p>
-        ${message ? `<p>メッセージ：${message}</p>` : ''}
-        <p style="color:#666;font-size:0.9em;">
-          ご不明な点は narabadocf@gmail.com までお問い合わせください。
-        </p>
-      </div>
-    `;
+    <div style="background:#f7f9fc;border-radius:10px;padding:22px 24px;margin-bottom:28px;border:1px solid #e8ecf0;">
+      <div style="font-size:12px;font-weight:bold;color:#1a2744;margin-bottom:14px;border-left:3px solid #c9a227;padding-left:10px;letter-spacing:1px;">□ ご支援内容</div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:9px 10px;font-size:12px;color:#999;width:38%;">管理番号</td>
+            <td style="padding:9px 10px;font-size:24px;font-weight:bold;color:#c9a227;letter-spacing:4px;">${transferCode}</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 10px;font-size:12px;color:#999;">ランク</td>
+            <td style="padding:9px 10px;font-size:14px;font-weight:bold;color:#333;">${tier}</td></tr>
+        <tr><td style="padding:9px 10px;font-size:12px;color:#999;">口数</td>
+            <td style="padding:9px 10px;font-size:14px;color:#333;">${units}口</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 10px;font-size:12px;color:#999;">支援金額</td>
+            <td style="padding:9px 10px;font-size:18px;font-weight:bold;color:#e74c3c;">${fmtAmt(totalAmount)}</td></tr>
+      </table>
+    </div>
 
-    // 管理者へのメール
-    const adminHtml = `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-        <h2 style="color:#1a3a5c;">【新規支援申込】${projectTitle}</h2>
-        <table style="border-collapse:collapse;width:100%;margin:20px 0;">
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">振込コード</td>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;color:#e55;">${transferCode}</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">支援者名</td>
-            <td style="padding:10px;border:1px solid #ddd;">${supporterName}</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">メール</td>
-            <td style="padding:10px;border:1px solid #ddd;">${supporterEmail}</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">ティア</td>
-            <td style="padding:10px;border:1px solid #ddd;">${tier}</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">口数</td>
-            <td style="padding:10px;border:1px solid #ddd;">${units}口</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">金額</td>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">¥${Number(totalAmount).toLocaleString()}</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">振込期限</td>
-            <td style="padding:10px;border:1px solid #ddd;">${deadlineStr}</td>
-          </tr>
-          <tr>
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">プロジェクトID</td>
-            <td style="padding:10px;border:1px solid #ddd;">${projectId || 1}</td>
-          </tr>
-          ${message ? `
-          <tr style="background:#f0f4f8;">
-            <td style="padding:10px;border:1px solid #ddd;font-weight:bold;">メッセージ</td>
-            <td style="padding:10px;border:1px solid #ddd;">${message}</td>
-          </tr>` : ''}
-        </table>
-        <p>
-          <a href="https://cloudfan.vercel.app/admin"
-             style="background:#1a3a5c;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">
-            管理画面で承認する
-          </a>
-        </p>
-      </div>
-    `;
+    <div style="background:linear-gradient(135deg,#1a2744 0%,#243660 100%);border-radius:10px;padding:28px 24px;text-align:center;margin-bottom:28px;">
+      <div style="font-size:11px;color:#8899bb;margin-bottom:10px;letter-spacing:2px;">お振込管理番号</div>
+      <div style="font-size:52px;font-weight:bold;color:#ffffff;letter-spacing:10px;line-height:1;">${transferCode}</div>
+      <div style="font-size:12px;color:#8899bb;margin-top:12px;">振込名義人の前に必ずご記載ください</div>
+    </div>
 
-    // メール送信
+    <div style="background:#fffde7;border:1px solid #ffe082;border-radius:10px;padding:22px 24px;margin-bottom:28px;">
+      <div style="font-size:13px;font-weight:bold;color:#1a2744;margin-bottom:14px;">🏦 振込先情報</div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;width:38%;border-bottom:1px solid #f5e47a;">銀行名</td>
+            <td style="padding:8px 0;font-size:13px;color:#333;border-bottom:1px solid #f5e47a;">住信SBIネット銀行（0038）</td></tr>
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;border-bottom:1px solid #f5e47a;">支店名</td>
+            <td style="padding:8px 0;font-size:13px;color:#333;border-bottom:1px solid #f5e47a;">法人第一支店（106）</td></tr>
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;border-bottom:1px solid #f5e47a;">口座種別</td>
+            <td style="padding:8px 0;font-size:13px;color:#333;border-bottom:1px solid #f5e47a;">普通</td></tr>
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;border-bottom:1px solid #f5e47a;">口座番号</td>
+            <td style="padding:8px 0;font-size:14px;font-weight:bold;color:#333;border-bottom:1px solid #f5e47a;">2787470</td></tr>
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;border-bottom:1px solid #f5e47a;">口座名義</td>
+            <td style="padding:8px 0;font-size:14px;font-weight:bold;color:#333;border-bottom:1px solid #f5e47a;">一般社団法人 Plus Mind</td></tr>
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;border-bottom:1px solid #f5e47a;">振込金額</td>
+            <td style="padding:8px 0;font-size:15px;font-weight:bold;color:#e74c3c;border-bottom:1px solid #f5e47a;">${fmtAmt(totalAmount)}</td></tr>
+        <tr><td style="padding:8px 0;font-size:13px;color:#999;">振込期限</td>
+            <td style="padding:8px 0;font-size:13px;font-weight:bold;color:#e74c3c;">${deadlineFull}</td></tr>
+      </table>
+    </div>
+
+    <div style="background:#fffbf0;border:1px solid #ffe082;border-radius:10px;padding:18px 24px;text-align:center;margin-bottom:28px;">
+      <div style="font-size:12px;color:#888;margin-bottom:6px;">振込名義人名の前に必ずこの番号を入力してください</div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:8px;">例）${transferCode} ヤマダ タロウ</div>
+      <div style="font-size:40px;font-weight:bold;color:#c9a227;letter-spacing:8px;">${transferCode}</div>
+    </div>
+
+    ${message ? `<div style="background:#e3f2fd;border-left:4px solid #1565c0;border-radius:6px;padding:16px 20px;margin-bottom:28px;">
+      <div style="font-size:12px;color:#1565c0;font-weight:bold;margin-bottom:6px;">応援メッセージ</div>
+      <p style="font-size:14px;color:#333;margin:0;line-height:1.7;">"${message}"</p>
+    </div>` : ""}
+
+    <div style="background:#f0f9f0;border-radius:10px;padding:22px 24px;margin-bottom:28px;">
+      <div style="font-size:13px;font-weight:bold;color:#1a2744;margin-bottom:18px;">✅ 入金確認後の流れ</div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:33%;text-align:center;padding:6px 8px;vertical-align:top;">
+            <div style="font-size:26px;margin-bottom:8px;">📊</div>
+            <div style="font-size:11px;color:#555;line-height:1.6;">入金確認後、サイト上の支援情報・支援者数が更新されます</div>
+          </td>
+          <td style="width:33%;text-align:center;padding:6px 8px;vertical-align:top;">
+            <div style="font-size:26px;margin-bottom:8px;">🎁</div>
+            <div style="font-size:11px;color:#555;line-height:1.6;">返礼品（部員・監督からの直筆メッセージカード）を順次お送りします</div>
+          </td>
+          <td style="width:33%;text-align:center;padding:6px 8px;vertical-align:top;">
+            <div style="font-size:26px;margin-bottom:8px;">📧</div>
+            <div style="font-size:11px;color:#555;line-height:1.6;">活動報告メールを定期的にお届けします</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="font-size:12px;color:#999;text-align:center;margin-bottom:0;">
+      ご不明な点は <a href="mailto:narabadocf@gmail.com" style="color:#1a2744;font-weight:bold;">narabadocf@gmail.com</a> までご連絡ください。
+    </p>
+  </td></tr>
+
+  <tr><td style="background:#1a2744;padding:20px 40px;text-align:center;">
+    <p style="color:#8899bb;font-size:11px;margin:0;letter-spacing:1px;">© 2025 BADMINTON SUPPORT HOKKAIDO | 一般社団法人 Plus Mind</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+    // ===== 管理者メール =====
+    const adminHtml = `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>新規支援申込通知</title></head>
+<body style="font-family:Arial,sans-serif;background:#f0f2f5;padding:20px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+  <div style="background:linear-gradient(135deg,#1a2744 0%,#243660 100%);padding:22px 30px;">
+    <h2 style="color:#c9a227;margin:0;font-size:16px;letter-spacing:1px;">【管理者通知】新しい支援申込</h2>
+    <p style="color:#8899bb;margin:4px 0 0;font-size:12px;">${projectTitle}</p>
+  </div>
+  <div style="padding:28px 30px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      <tr style="background:#f7f9fc;"><td style="padding:10px 12px;font-size:12px;color:#999;width:35%;border-bottom:1px solid #eee;">プロジェクトID</td><td style="padding:10px 12px;font-size:13px;border-bottom:1px solid #eee;">${projectId || 1}</td></tr>
+      <tr><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">支援者名</td><td style="padding:10px 12px;font-size:14px;font-weight:bold;border-bottom:1px solid #eee;">${supporterName}</td></tr>
+      <tr style="background:#f7f9fc;"><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">メール</td><td style="padding:10px 12px;font-size:13px;border-bottom:1px solid #eee;">${supporterEmail}</td></tr>
+      <tr><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">ランク</td><td style="padding:10px 12px;font-size:13px;border-bottom:1px solid #eee;">${tier}</td></tr>
+      <tr style="background:#f7f9fc;"><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">口数</td><td style="padding:10px 12px;font-size:13px;border-bottom:1px solid #eee;">${units}口</td></tr>
+      <tr><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">支援金額</td><td style="padding:10px 12px;font-size:16px;font-weight:bold;color:#e74c3c;border-bottom:1px solid #eee;">${fmtAmt(totalAmount)}</td></tr>
+      <tr style="background:#f7f9fc;"><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">振込コード</td><td style="padding:10px 12px;font-size:18px;font-weight:bold;color:#c9a227;letter-spacing:3px;border-bottom:1px solid #eee;">${transferCode}</td></tr>
+      <tr><td style="padding:10px 12px;font-size:12px;color:#999;border-bottom:1px solid #eee;">振込期限</td><td style="padding:10px 12px;font-size:13px;font-weight:bold;color:#e74c3c;border-bottom:1px solid #eee;">${deadlineFull}</td></tr>
+      ${message ? `<tr style="background:#f7f9fc;"><td style="padding:10px 12px;font-size:12px;color:#999;">メッセージ</td><td style="padding:10px 12px;font-size:13px;">${message}</td></tr>` : ""}
+    </table>
+    <div style="margin-top:24px;text-align:center;">
+      <a href="https://cloudfan.vercel.app/admin" style="background:#1a2744;color:#fff;padding:12px 30px;text-decoration:none;border-radius:6px;font-size:14px;display:inline-block;">管理画面で確認する</a>
+    </div>
+  </div>
+</div>
+</body></html>`;
+
     await transporter.sendMail({
-      from:    ADMIN_EMAIL,
+      from:    `"BADMINTON SUPPORT HOKKAIDO" <${ADMIN_EMAIL}>`,
       to:      supporterEmail,
-      subject: `【振込案内】${projectTitle} 振込コード：${transferCode}`,
+      subject: `【支援受付】管理番号 ${transferCode} - ご支援ありがとうございます`,
       html:    supporterHtml,
     });
 
     await transporter.sendMail({
-      from:    ADMIN_EMAIL,
+      from:    `"BADMINTON SUPPORT HOKKAIDO" <${ADMIN_EMAIL}>`,
       to:      ADMIN_EMAIL,
-      subject: `【新規支援】${supporterName}様 ¥${Number(totalAmount).toLocaleString()} コード：${transferCode}`,
+      subject: `【管理者通知】新規支援申込 ${transferCode}（${supporterName}様・${fmtAmt(totalAmount)}）`,
       html:    adminHtml,
     });
 
     return NextResponse.json({ success: true, transferCode });
 
   } catch (err) {
-    console.error('Send-email error:', err);
-    return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+    console.error("Send-email error:", err);
+    return NextResponse.json({ error: "サーバーエラーが発生しました" }, { status: 500 });
   }
 }
