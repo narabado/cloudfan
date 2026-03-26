@@ -96,6 +96,22 @@ function parseStory(story: string | null): StoryBlock[] {
   return [];
 }
 
+function getTierIcon(amount: number): string {
+  if (amount >= 100000) return '👑';
+  if (amount >= 30000)  return '💎';
+  if (amount >= 10000)  return '🏆';
+  if (amount >= 3000)   return '🥈';
+  return '🥉';
+}
+
+function getTierBg(amount: number): string {
+  if (amount >= 100000) return 'linear-gradient(135deg, #7c3aed, #a855f7)';
+  if (amount >= 30000)  return 'linear-gradient(135deg, #0369a1, #38bdf8)';
+  if (amount >= 10000)  return 'linear-gradient(135deg, #d97706, #fbbf24)';
+  if (amount >= 3000)   return 'linear-gradient(135deg, #64748b, #94a3b8)';
+  return 'linear-gradient(135deg, #92400e, #d97706)';
+}
+
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -173,7 +189,6 @@ export default function ProjectDetail() {
   const progressPct = goalAmount > 0
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;
-
 
   const topTiers   = tiers.slice(0, Math.min(5, tiers.length));
   const tierColors = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
@@ -356,7 +371,8 @@ export default function ProjectDetail() {
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>支援プランはまだ登録されていません。</p>
                   )}
                   {topTiers.map((tier, i) => {
-                    const c = tierColors[i] || '#1a56db';                    const tierId = String(tier.id ?? i);
+                    const c = tierColors[i] || '#1a56db';
+                    const tierId = String(tier.id ?? i);
                     return (
                       <div key={tierId} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
                         <div style={{ background: c, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -368,8 +384,11 @@ export default function ProjectDetail() {
                         </div>
                         <div style={{ padding: '18px 20px', background: '#fff' }}>
                           <p style={{ color: '#334155', fontSize: 14, lineHeight: 1.9, marginBottom: 14 }}>{tier.description}</p>
-                          <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b', marginBottom: 18 }}>                            {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
-                          </div>
+                          {tier.limit != null && (
+                            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b', marginBottom: 18 }}>
+                              <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>
+                            </div>
+                          )}
                           <button
                             disabled={ended}
                             onClick={() => { if (!ended) router.push(`/projects/${id}/support?tier=${tierId}`); }}
@@ -395,23 +414,28 @@ export default function ProjectDetail() {
                   {supporters.length === 0 && (
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>まだ支援者がいません。最初の支援者になりましょう！</p>
                   )}
-                  {supporters.map((s, idx) => (
-                    <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
-                      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #1a2e4a, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>⭐</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>{String(s['name'] || s['名前'] || '名前未設定')}</span>
-                          <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16 }}>¥{(Number(s['total_amount']) || 0).toLocaleString()}</span>
+                  {supporters.map((s, idx) => {
+                    const amount = Number(s['total_amount']) || 0;
+                    const icon = getTierIcon(amount);
+                    const bg   = getTierBg(amount);
+                    return (
+                      <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{icon}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>{String(s['name'] || s['名前'] || '名前未設定')}</span>
+                            <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16 }}>¥{amount.toLocaleString()}</span>
+                          </div>
+                          {s['message'] && (
+                            <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>{String(s['message'])}</p>
+                          )}
+                          <span style={{ color: '#94a3b8', fontSize: 11 }}>
+                            {s['created_at'] ? new Date(String(s['created_at'])).toLocaleDateString('ja-JP') : ''}
+                          </span>
                         </div>
-                        {s['message'] && (
-                          <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>{String(s['message'])}</p>
-                        )}
-                        <span style={{ color: '#94a3b8', fontSize: 11 }}>
-                          {s['created_at'] ? new Date(String(s['created_at'])).toLocaleDateString('ja-JP') : ''}
-                        </span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -425,7 +449,10 @@ export default function ProjectDetail() {
                   )}
                   {rankedSupporters.map((s, idx) => {
                     const amount = Number(s['total_amount']) || 0;
-                    const isTop3 = idx < 3;
+                    const isTop3  = idx < 3;
+                    const isTop10 = idx < 10;
+                    const tierIcon = getTierIcon(amount);
+                    const tierBg   = getTierBg(amount);
                     return (
                       <div key={String(s['id'] || idx)} style={{
                         display: 'flex', gap: 16, padding: '16px 20px', marginBottom: 12,
@@ -434,11 +461,13 @@ export default function ProjectDetail() {
                           ? idx === 0 ? 'linear-gradient(135deg, #fef9c3, #fef3c7)'
                           : idx === 1 ? 'linear-gradient(135deg, #f1f5f9, #e2e8f0)'
                           : 'linear-gradient(135deg, #fff7ed, #ffedd5)'
+                          : isTop10 ? 'linear-gradient(135deg, #f0f9ff, #e0f2fe)'
                           : '#f8fafc',
                         border: isTop3
                           ? idx === 0 ? '2px solid #fbbf24'
                           : idx === 1 ? '2px solid #94a3b8'
                           : '2px solid #fb923c'
+                          : isTop10 ? '2px solid #7dd3fc'
                           : '1px solid #e2e8f0',
                       }}>
                         <div style={{
@@ -447,12 +476,14 @@ export default function ProjectDetail() {
                             ? idx === 0 ? 'linear-gradient(135deg, #f59e0b, #fbbf24)'
                             : idx === 1 ? 'linear-gradient(135deg, #64748b, #94a3b8)'
                             : 'linear-gradient(135deg, #ea580c, #fb923c)'
+                            : isTop10 ? tierBg
                             : '#e2e8f0',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: isTop3 ? 24 : 15, fontWeight: 900,
-                          color: isTop3 ? '#fff' : '#64748b',
+                          fontSize: isTop3 ? 24 : isTop10 ? 22 : 15,
+                          fontWeight: 900,
+                          color: (isTop3 || isTop10) ? '#fff' : '#64748b',
                         }}>
-                          {isTop3 ? rankMedals[idx] : `${idx + 1}`}
+                          {isTop3 ? rankMedals[idx] : isTop10 ? tierIcon : `${idx + 1}`}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
