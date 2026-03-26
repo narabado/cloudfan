@@ -45,6 +45,8 @@ const CHAPTER_TITLES = [
   'チームからのメッセージ',
 ];
 
+const NEXT_GOAL = 1500000;
+
 function calcDaysLeft(deadline: string | null): { text: string; color: string } {
   if (!deadline || deadline.trim() === '') return { text: '期限未設定', color: '#94a3b8' };
   const d = new Date(deadline);
@@ -94,6 +96,25 @@ function parseStory(story: string | null): StoryBlock[] {
     })).filter(b => b.body);
   }
   return [];
+}
+
+// **テキスト** をハイライト表示するレンダラー
+function renderMarkedText(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const inner = part.slice(2, -2);
+      return (
+        <mark key={i} style={{
+          background: 'linear-gradient(180deg, transparent 60%, #fde047 60%)',
+          fontWeight: 800,
+          padding: '0 2px',
+          borderRadius: 2,
+        }}>{inner}</mark>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
 
 function getTierIcon(amount: number): string {
@@ -200,7 +221,13 @@ export default function ProjectDetail() {
   const barPct      = Math.min(100, rawPct);
   const isOver100   = rawPct >= 100;
 
+  // ネクストゴール進捗
+  const nextGoalPct    = Math.min(100, Math.round((totalRaised / NEXT_GOAL) * 100));
+  const nextGoalRem    = Math.max(0, NEXT_GOAL - totalRaised);
+  const showNextGoal   = isOver100;
+
   const topTiers   = tiers.slice(0, Math.min(5, tiers.length));
+  const sidebarTiers = tiers.slice(0, Math.min(3, tiers.length));
   const tierColors = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
 
   const rankedSupporters = [...supporters].sort(
@@ -233,6 +260,23 @@ export default function ProjectDetail() {
     flexShrink: 0,
   });
 
+  // ストーリー途中の支援ボタン
+  const MidSupportButton = () => (
+    <div style={{ margin: '32px 0', textAlign: 'center' }}>
+      <button
+        onClick={() => setActiveTab('tiers')}
+        style={{
+          padding: '14px 36px',
+          background: 'linear-gradient(135deg, #d4af37, #f5d060)',
+          color: '#1a2e4a', border: 'none', borderRadius: 40,
+          fontWeight: 800, fontSize: 15, cursor: 'pointer',
+          boxShadow: '0 4px 16px rgba(212,175,55,0.4)',
+        }}>
+        💎 3,000円から支援を始める（プランを見る）→
+      </button>
+    </div>
+  );
+
   return (
     <>
       <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: '#f8fafc', minHeight: '100vh' }}>
@@ -263,6 +307,23 @@ export default function ProjectDetail() {
           </div>
         </nav>
 
+        {/* ネクストゴール帯 */}
+        {showNextGoal && (
+          <div style={{
+            background: 'linear-gradient(135deg, #dc2626, #ea580c)',
+            color: '#fff', textAlign: 'center',
+            padding: isMobile ? '10px 16px' : '12px 24px',
+            fontSize: isMobile ? 13 : 15, fontWeight: 800,
+            letterSpacing: '0.05em',
+            boxShadow: '0 2px 8px rgba(220,38,38,0.4)',
+          }}>
+            🔥【ネクストゴール挑戦中！】目標150万円へ &nbsp;|&nbsp; あと ¥{nextGoalRem.toLocaleString()} &nbsp;
+            <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: '2px 12px', fontSize: isMobile ? 11 : 13 }}>
+              {nextGoalPct}% 達成
+            </span>
+          </div>
+        )}
+
         {project.image_url && (
           <div style={{ width: '100%', aspectRatio: '16/6', overflow: 'hidden', position: 'relative' }}>
             <img src={project.image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }} />
@@ -292,7 +353,19 @@ export default function ProjectDetail() {
               )}
             </div>
 
-            <h1 style={{ fontSize: isMobile ? 20 : 26, color: '#0f172a', marginBottom: 12, lineHeight: 1.5, fontWeight: 900, wordBreak: 'break-word' }}>{project.title}</h1>
+            <h1 style={{ fontSize: isMobile ? 20 : 26, color: '#0f172a', marginBottom: 8, lineHeight: 1.5, fontWeight: 900, wordBreak: 'break-word' }}>{project.title}</h1>
+
+            {/* 指示1：サブキャッチコピー */}
+            {showNextGoal && (
+              <p style={{
+                fontSize: isMobile ? 14 : 16, fontWeight: 800,
+                color: '#dc2626', marginBottom: 16, lineHeight: 1.7,
+                borderLeft: '4px solid #dc2626', paddingLeft: 12,
+              }}>
+                皆さまの温かいご支援で、全国の壁を突破する「最高の環境」を選手たちに届けたい。
+              </p>
+            )}
+
             <p style={{ color: '#475569', fontSize: isMobile ? 14 : 15, lineHeight: 1.9, marginBottom: 20, wordBreak: 'break-word' }}>{project.description}</p>
 
             {project.deadline && (
@@ -347,24 +420,39 @@ export default function ProjectDetail() {
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>ストーリーはまだ登録されていません。</p>
                   )}
                   {storyBlocks.map((block, i) => (
-                    <div key={i} style={{ marginBottom: 48, paddingBottom: 40, borderBottom: i < storyBlocks.length - 1 ? '2px dashed #e2e8f0' : 'none' }}>
-                      <h3 style={{
-                        background: 'linear-gradient(135deg, #1a2e4a, #2563eb)',
-                        color: '#fff', padding: '12px 20px',
-                        borderRadius: 10, marginBottom: 20, fontSize: isMobile ? 14 : 16,
-                        fontWeight: 800, wordBreak: 'break-word',
-                      }}>{block.title || CHAPTER_TITLES[i] || `第${i + 1}章`}</h3>
-                      {block.image_url && (
-                        <img src={block.image_url} alt={`story-${i}`}
-                          style={{
-                            width: '100%', objectFit: 'contain',
-                            maxHeight: isMobile ? '280px' : '450px',
-                            display: 'block',
-                            marginLeft: 'auto', marginRight: 'auto', marginBottom: 20,
-                            borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                    <div key={i}>
+                      <div style={{ marginBottom: 48, paddingBottom: 40, borderBottom: i < storyBlocks.length - 1 ? '2px dashed #e2e8f0' : 'none' }}>
+                        {/* 指示2：見出し強化（左縦線＋大きく太字） */}
+                        <h3 style={{
+                          display: 'flex', alignItems: 'center', gap: 0,
+                          marginBottom: 20, fontSize: isMobile ? 15 : 18,
+                          fontWeight: 900, wordBreak: 'break-word', color: '#0f172a',
+                        }}>
+                          <span style={{
+                            display: 'inline-block', width: 5, minHeight: 28,
+                            background: 'linear-gradient(180deg, #2563eb, #1a2e4a)',
+                            borderRadius: 3, marginRight: 14, flexShrink: 0,
+                            alignSelf: 'stretch',
                           }} />
-                      )}
-                      <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{block.body}</p>
+                          {block.title || CHAPTER_TITLES[i] || `第${i + 1}章`}
+                        </h3>
+                        {block.image_url && (
+                          <img src={block.image_url} alt={`story-${i}`}
+                            style={{
+                              width: '100%', objectFit: 'contain',
+                              maxHeight: isMobile ? '280px' : '450px',
+                              display: 'block',
+                              marginLeft: 'auto', marginRight: 'auto', marginBottom: 20,
+                              borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                            }} />
+                        )}
+                        {/* 指示2：**テキスト** マーカー記法対応 */}
+                        <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {renderMarkedText(block.body)}
+                        </p>
+                      </div>
+                      {/* 指示3：2番目・4番目のブロック後に支援ボタン */}
+                      {(i === 1 || i === 3) && !ended && <MidSupportButton />}
                     </div>
                   ))}
                   {ytId && (
@@ -570,6 +658,7 @@ export default function ProjectDetail() {
             </div>
           </div>
 
+          {/* ===== サイドバー ===== */}
           <div>
             <div style={{
               background: '#fff', borderRadius: 18, padding: 24,
@@ -577,33 +666,43 @@ export default function ProjectDetail() {
               position: isMobile ? 'static' : 'sticky',
               top: 80, border: '1px solid #e2e8f0',
             }}>
+              {/* ネクストゴール進捗 */}
+              {showNextGoal && (
+                <div style={{ background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid #fed7aa', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#ea580c', marginBottom: 6 }}>🔥 ネクストゴール挑戦中</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: '#9a3412' }}>目標 ¥{NEXT_GOAL.toLocaleString()}</span>
+                    <span style={{ fontSize: 16, fontWeight: 900, color: '#ea580c' }}>{nextGoalPct}%</span>
+                  </div>
+                  <div style={{ height: 7, background: '#fed7aa', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${nextGoalPct}%`, background: 'linear-gradient(90deg, #ea580c, #f97316)', borderRadius: 4, transition: 'width 1s ease' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9a3412', marginTop: 5 }}>あと ¥{nextGoalRem.toLocaleString()} で達成！</div>
+                </div>
+              )}
+
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                   <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>達成率</span>
-                  <span style={{
-                    fontSize: 32, fontWeight: 900,
-                    color: isOver100 ? '#d97706' : '#1a2e4a',
-                  }}>{progressPct}%{isOver100 && ' 🎉'}</span>
+                  <span style={{ fontSize: 32, fontWeight: 900, color: isOver100 ? '#d97706' : '#1a2e4a' }}>
+                    {progressPct}%{isOver100 && ' 🎉'}
+                  </span>
                 </div>
                 <div style={{ height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
                   <div style={{
-                    height: '100%',
-                    width: `${barPct}%`,
-                    background: isOver100
-                      ? 'linear-gradient(90deg, #d97706, #f59e0b, #fbbf24)'
-                      : 'linear-gradient(90deg, #2563eb, #059669)',
-                    borderRadius: 5,
-                    transition: 'width 1s ease',
+                    height: '100%', width: `${barPct}%`,
+                    background: isOver100 ? 'linear-gradient(90deg, #d97706, #f59e0b, #fbbf24)' : 'linear-gradient(90deg, #2563eb, #059669)',
+                    borderRadius: 5, transition: 'width 1s ease',
                   }} />
                 </div>
                 {isOver100 && (
-                  <p style={{ fontSize: 11, color: '#d97706', fontWeight: 700, marginTop: 4, textAlign: 'right' }}>
-                    目標達成！引き続き支援を受付中
-                  </p>
+                  <p style={{ fontSize: 11, color: '#d97706', fontWeight: 700, marginTop: 4, textAlign: 'right' }}>目標達成！引き続き支援を受付中</p>
                 )}
               </div>
+
               <div style={{ fontSize: 30, fontWeight: 900, color: '#1a2e4a', marginBottom: 4 }}>¥{totalRaised.toLocaleString()}</div>
               <div style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>目標: ¥{goalAmount.toLocaleString()}</div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
                 <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '12px 8px', textAlign: 'center', border: '1px solid #bae6fd' }}>
                   <div style={{ fontSize: 24, fontWeight: 900, color: '#0369a1' }}>{supporters.length}</div>
@@ -614,9 +713,11 @@ export default function ProjectDetail() {
                   <div style={{ color: '#64748b', fontSize: 12, fontWeight: 600 }}>残り期間</div>
                 </div>
               </div>
+
               <div style={{ textAlign: 'center', marginBottom: 18 }}>
                 <span style={{ padding: '8px 24px', borderRadius: 20, fontWeight: 800, fontSize: 14, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
               </div>
+
               <button
                 onClick={() => !ended && setActiveTab('tiers')}
                 disabled={ended}
@@ -628,12 +729,46 @@ export default function ProjectDetail() {
                   cursor: ended ? 'not-allowed' : 'pointer',
                   boxShadow: ended ? 'none' : '0 6px 20px rgba(212,175,55,0.45)',
                 }}>{ended ? '募集終了' : '⭐ 今すぐ支援する'}</button>
+
+              {/* 指示4：サイドバーティア抜粋 */}
+              {!ended && sidebarTiers.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>── 人気の支援プラン ──</div>
+                  {sidebarTiers.map((tier, i) => {
+                    const c = tierColors[i] || '#2563eb';
+                    const tierId = String(tier.id ?? i);
+                    return (
+                      <button
+                        key={tierId}
+                        onClick={() => router.push(`/projects/${id}/support?tier=${tierId}`)}
+                        style={{
+                          width: '100%', marginBottom: 8, padding: '10px 14px',
+                          border: `1.5px solid ${c}`, borderRadius: 10,
+                          background: '#fff', cursor: 'pointer',
+                          textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = `${c}11`)}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+                      >
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: c }}>{tier.name}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tier.description}</div>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 900, color: c, flexShrink: 0, marginLeft: 8 }}>¥{(Number(tier.amount) || 0).toLocaleString()}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <button onClick={() => setActiveTab('tiers')} style={{
                 width: '100%', padding: '12px 0',
                 background: '#fff', color: '#2563eb',
                 border: '2px solid #2563eb', borderRadius: 12,
                 fontWeight: 700, fontSize: 14, cursor: 'pointer',
               }}>💎 支援プランを見る</button>
+
               <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                 <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10, textAlign: 'center', fontWeight: 600 }}>シェアして応援！</p>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
