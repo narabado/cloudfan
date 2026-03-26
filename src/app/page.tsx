@@ -10,7 +10,6 @@ interface Project {
   club: string;
   description: string;
   image_url: string | null;
-  '画像'?: string[] | null;
   goal_amount: number;
   current_amount: number;
   deadline: string | null;
@@ -227,8 +226,8 @@ export default function TopPage() {
                     (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 16px rgba(0,0,0,0.08)';
                   }}>
                   <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: '#e2e8f0' }}>
-                    {(p['画像']?.[0] || p.image_url) ? (
-                      <img src={p['画像']?.[0] || p.image_url || ''} alt={p.title}
+                    {p.image_url ? (
+                      <img src={p.image_url || ''} alt={p.title}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%',
