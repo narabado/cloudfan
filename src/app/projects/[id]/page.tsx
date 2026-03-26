@@ -174,11 +174,6 @@ export default function ProjectDetail() {
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;
 
-  const tierCount: Record<string, number> = {};
-  for (const s of supporters) {
-    const key = String(s['階層'] || s['tier_name'] || '');
-    if (key) tierCount[key] = (tierCount[key] || 0) + 1;
-  }
 
   const topTiers   = tiers.slice(0, Math.min(5, tiers.length));
   const tierColors = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
@@ -361,9 +356,7 @@ export default function ProjectDetail() {
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '40px 0' }}>支援プランはまだ登録されていません。</p>
                   )}
                   {topTiers.map((tier, i) => {
-                    const c = tierColors[i] || '#1a56db';
-                    const sCount = tierCount[tier.name] || 0;
-                    const tierId = String(tier.id ?? i);
+                    const c = tierColors[i] || '#1a56db';                    const tierId = String(tier.id ?? i);
                     return (
                       <div key={tierId} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
                         <div style={{ background: c, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -375,9 +368,7 @@ export default function ProjectDetail() {
                         </div>
                         <div style={{ padding: '18px 20px', background: '#fff' }}>
                           <p style={{ color: '#334155', fontSize: 14, lineHeight: 1.9, marginBottom: 14 }}>{tier.description}</p>
-                          <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b', marginBottom: 18 }}>
-                            <span>👥 {sCount}人が支援</span>
-                            {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
+                          <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b', marginBottom: 18 }}>                            {tier.limit != null && <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>}
                           </div>
                           <button
                             disabled={ended}
