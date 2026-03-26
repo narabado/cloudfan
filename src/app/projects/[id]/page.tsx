@@ -128,6 +128,7 @@ export default function ProjectDetail() {
       if (Array.isArray(rawTiers) && rawTiers.length > 0) {
         setTiers(rawTiers.map((t: Tier, i: number) => ({ ...t, id: t.id ?? String(i) })));
       }
+
       const { data: supRows } = await supabase
         .from('supporters')
         .select('*')
@@ -135,7 +136,10 @@ export default function ProjectDetail() {
 
       if (supRows) {
         const rows = supRows as unknown as Supporter[];
-        const approvedRows = (rows ?? []).filter((s: any) => s['status'] === '承認');
+        const approvedRows = (rows ?? []).filter((s: any) => {
+          const st = String(s['status'] ?? '');
+          return st === 'approved' || st === '承認';
+        });
         setSupporters(approvedRows);
         const total = approvedRows.reduce(
           (sum, r) => sum + (Number(r['total_amount']) || 0), 0
@@ -170,9 +174,9 @@ export default function ProjectDetail() {
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;
 
-    const tierCount: Record<string, number> = {};
+  const tierCount: Record<string, number> = {};
   for (const s of supporters) {
-    const key = String(s['階層'] || '');
+    const key = String(s['階層'] || s['tier_name'] || '');
     if (key) tierCount[key] = (tierCount[key] || 0) + 1;
   }
 
