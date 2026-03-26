@@ -23,7 +23,7 @@ type Supporter = {
 type Tier = {
   id: string;
   name: string;
-  total_amount: number;
+  amount: number;
 };
 
 type Project = {
@@ -371,6 +371,7 @@ export default function AdminPage() {
     </div>
   );
 }
+
 
 
 
