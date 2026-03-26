@@ -251,7 +251,7 @@ export default function ProjectDetail() {
 
         {project.image_url && (
           <div style={{ width: '100%', aspectRatio: '16/6', overflow: 'hidden', position: 'relative' }}>
-            <img src={project.image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }} />
+            <img src={project.image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%)' }} />
             <div style={{
               position: 'absolute', top: 16, right: 16, padding: '6px 16px',
@@ -332,7 +332,7 @@ export default function ProjectDetail() {
                       }}>{block.title || CHAPTER_TITLES[i] || `第${i + 1}章`}</h3>
                       {block.image_url && (
                         <img src={block.image_url} alt={`story-${i}`}
-                          style={{ width: '100%', objectFit: 'contain', maxHeight: '400px', background: '#f8fafc', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block', marginBottom: 20 }} />
+                          style={{ width: '100%', objectFit: 'contain', maxHeight: '450px', display: 'block', margin: '0 auto', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block', marginBottom: 20 }} />
                       )}
                       <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap' }}>{block.body}</p>
                     </div>
