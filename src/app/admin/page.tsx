@@ -20,18 +20,24 @@ type Supporter = {
   created_at: string;
 };
 
+type Tier = {
+  id: string;
+  name: string;
+  amount: number;
+};
+
 type Project = {
   id: string;
   title: string;
   status: string;
   goal_amount: number;
   created_at: string;
+  tiers: Tier[] | null; // ← 追加
 };
 
 export default function AdminPage() {
   const router = useRouter();
 
-  // 認証
   const [isAuth,    setIsAuth]    = useState(false);
   const [password,  setPassword]  = useState("");
   const [authError, setAuthError] = useState("");
@@ -60,7 +66,6 @@ export default function AdminPage() {
     router.push("/");
   };
 
-  // データ
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [projects,   setProjects]   = useState<Project[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -88,10 +93,30 @@ export default function AdminPage() {
     fetchAll();
   };
 
+  // ── 支援者削除 ──────────────────────────────────────
+  const deleteSupporter = async (id: string) => {
+    if (!confirm("この支援者データを完全に削除しますか？\nこの操作は取り消せません。")) return;
+    const { error } = await supabase.from("supporters").delete().eq("id", id);
+    if (!error) {
+      setSupporters(prev => prev.filter(s => s.id !== id));
+    }
+  };
+
+  // ── 金額補完：amount=0 の場合ティアから取得 ─────────
+  const resolveAmount = (s: Supporter): number => {
+    if (s.amount && s.amount > 0) return s.amount;
+    const prj = projects.find(p => p.id === s.project_id);
+    if (prj?.tiers) {
+      const tier = prj.tiers.find(t => t.name === s.tier_name);
+      if (tier) return tier.amount;
+    }
+    return 0;
+  };
+
   const isApproved  = (s: string) => ["approved",  "承認", "承認済み"].includes(s);
   const isPending   = (s: string) => ["pending",   "未承認", "未処理", ""].includes(s);
   const isRejected  = (s: string) => ["rejected",  "却下"].includes(s);
-  const isCancelled = (s: string) => ["cancelled", "キャンセル"].includes(s);
+  const isCancelled = (s: string) => ["cancelled", "キャンセル", "取消"].includes(s);
 
   const statusLabel = (s: string) => {
     if (isApproved(s))  return "✅ 承認済み";
@@ -120,10 +145,8 @@ export default function AdminPage() {
     return matchPrj && matchSts;
   });
 
-  // 認証確認前
   if (checking) return null;
 
-  // ログイン画面
   if (!isAuth) return (
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
@@ -178,7 +201,6 @@ export default function AdminPage() {
     </div>
   );
 
-  // データ読み込み中
   if (loading) return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
       <p>読み込み中...</p>
@@ -187,9 +209,9 @@ export default function AdminPage() {
 
   const approvedList = supporters.filter(s => isApproved(s.status));
   const pendingList  = supporters.filter(s => isPending(s.status));
-  const totalAmount  = approvedList.reduce((sum, s) => sum + (s.amount || 0), 0);
+  // ← resolveAmount で合計を正しく計算
+  const totalAmount  = approvedList.reduce((sum, s) => sum + resolveAmount(s), 0);
 
-  // 管理画面本体
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
       {/* ヘッダー */}
@@ -260,24 +282,52 @@ export default function AdminPage() {
                     <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>データがありません</td></tr>
                   ) : filtered.map(s => {
                     const prjName = projects.find(p => p.id === s.project_id)?.title ?? s.project_id;
+                    const displayAmount = resolveAmount(s); // ← 金額補完
                     return (
                       <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                        <td style={{ padding: "10px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>{new Date(s.created_at).toLocaleDateString("ja-JP")}</td>
+                        <td style={{ padding: "10px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                          {new Date(s.created_at).toLocaleDateString("ja-JP")}
+                        </td>
                         <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.name}</td>
                         <td style={{ padding: "10px 12px" }}>{prjName}</td>
                         <td style={{ padding: "10px 12px" }}>{s.tier_name}</td>
-                        <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>¥{(s.amount || 0).toLocaleString()}</td>
+                        {/* ← 金額を補完後の値で表示 */}
+                        <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>
+                          ¥{displayAmount.toLocaleString()}
+                        </td>
                         <td style={{ padding: "10px 12px" }}>
                           <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 700, color: "#fff", background: statusColor(s.status) }}>
                             {statusLabel(s.status)}
                           </span>
                         </td>
-                        <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12 }}>{s.transfer_code ?? "-"}</td>
+                        <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12 }}>
+                          {s.transfer_code ?? "-"}
+                        </td>
                         <td style={{ padding: "10px 12px" }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            {!isApproved(s.status)  && <button onClick={() => updateStatus(s.id, "approved")}  style={{ padding: "4px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>承認</button>}
-                            {!isRejected(s.status)  && <button onClick={() => updateStatus(s.id, "rejected")}  style={{ padding: "4px 10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>却下</button>}
-                            {!isCancelled(s.status) && <button onClick={() => { if (confirm("取り消しますか？")) updateStatus(s.id, "cancelled"); }} style={{ padding: "4px 10px", background: "#6b7280", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>取消</button>}
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {!isApproved(s.status)  && (
+                              <button onClick={() => updateStatus(s.id, "approved")}
+                                style={{ padding: "4px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                承認
+                              </button>
+                            )}
+                            {!isRejected(s.status)  && (
+                              <button onClick={() => updateStatus(s.id, "rejected")}
+                                style={{ padding: "4px 10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                却下
+                              </button>
+                            )}
+                            {!isCancelled(s.status) && (
+                              <button onClick={() => { if (confirm("取り消しますか？")) updateStatus(s.id, "cancelled"); }}
+                                style={{ padding: "4px 10px", background: "#6b7280", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                取消
+                              </button>
+                            )}
+                            {/* ← 削除ボタン（新規追加） */}
+                            <button onClick={() => deleteSupporter(s.id)}
+                              style={{ padding: "4px 10px", background: "#1e293b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                              🗑️
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -306,7 +356,9 @@ export default function AdminPage() {
                       {p.status}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>目標: ¥{(p.goal_amount || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+                    目標: ¥{(p.goal_amount || 0).toLocaleString()}
+                  </div>
                   <button onClick={() => router.push(`/admin/project-edit?id=${p.id}`)} style={{ width: "100%", padding: "8px", background: "#f1f5f9", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                     ✏️ 編集
                   </button>
