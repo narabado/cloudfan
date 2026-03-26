@@ -1,4 +1,3 @@
-Set-Content -LiteralPath "C:\Users\user\Desktop\sports-support-hokkaido\src\app\admin\project-edit\ProjectEditForm.tsx" -Encoding UTF8 -Value @'
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -72,7 +71,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const heroPhotoRef = useRef<HTMLInputElement>(null);
-
   const photoRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
@@ -132,7 +130,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setLoading(false);
   };
 
-  // ── 支援者取得 ──────────────────────────────────────────
   const fetchSupporters = async () => {
     const { data, error } = await supabase
       .from('supporters')
@@ -145,7 +142,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     }
   };
 
-  // ── 支援者削除 ──────────────────────────────────────────
   const handleDeleteSupporter = async (supporterId: string) => {
     if (!confirm('この支援者データを削除しますか？この操作は取り消せません。')) return;
     setDeletingId(supporterId);
@@ -163,13 +159,10 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     }
   };
 
-  // ── ティアから金額を補完 ────────────────────────────────
   const resolveAmount = (supporter: Supporter): number => {
     if (supporter.amount && supporter.amount > 0) return supporter.amount;
-    // tier_id で一致するティアの金額を返す
     const matchedByTierId = tiers.find(t => t.id === supporter.tier_id);
     if (matchedByTierId) return matchedByTierId.amount;
-    // tier_name で一致するティアの金額を返す
     const matchedByName = tiers.find(t => t.name === supporter.tier_name);
     if (matchedByName) return matchedByName.amount;
     return 0;
@@ -191,7 +184,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     });
   };
 
-  // ── ヒーロー画像アップロード ────────────────────────────
   const handleHeroImageUpload = async (file: File) => {
     setHeroUploading(true);
     const ext = file.name.split('.').pop();
@@ -216,7 +208,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setHeroUploading(false);
   };
 
-  // ── ストーリーブロック画像アップロード ─────────────────
   const handleImageUpload = async (index: number, file: File) => {
     const ext = file.name.split('.').pop();
     const fileName = `story_block_${projectId}_${index}_${Date.now()}.${ext}`;
@@ -257,7 +248,10 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         tiers: tiers,
         story: JSON.stringify(blocks),
         image_url: project.image_url ?? null,
-        deadline: project.deadline && /^\d{4}-\d{2}-\d{2}$/.test(project.deadline) ? project.deadline : null,
+        deadline:
+          project.deadline && /^\d{4}-\d{2}-\d{2}$/.test(project.deadline)
+            ? project.deadline
+            : null,
       })
       .eq('id', Number(projectId));
 
@@ -488,22 +482,19 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         )}
       </section>
 
-      {/* ━━━━ 支援者一覧（新規追加） ━━━━ */}
+      {/* 支援者一覧 */}
       <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '2px solid #d1fae5' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e3a5f', margin: 0 }}>
             👥 支援者一覧
           </h2>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '14px', color: '#64748b' }}>
-              {supporters.length}名
-            </span>
+            <span style={{ fontSize: '14px', color: '#64748b' }}>{supporters.length}名</span>
             <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#16a34a' }}>
               合計 ¥{totalAmount.toLocaleString()}
             </span>
           </div>
         </div>
-
         {supporters.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px', background: '#f1f5f9', borderRadius: '8px' }}>
             まだ支援者がいません
@@ -515,18 +506,8 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               return (
                 <div
                   key={supporter.id}
-                  style={{
-                    background: 'white',
-                    borderRadius: '10px',
-                    padding: '14px 16px',
-                    border: '1px solid #e2e8f0',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto',
-                    gap: '12px',
-                    alignItems: 'center',
-                  }}
+                  style={{ background: 'white', borderRadius: '10px', padding: '14px 16px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'center' }}
                 >
-                  {/* 左側：支援者情報 */}
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                       <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#0f172a' }}>
@@ -543,33 +524,18 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
                     </div>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       {supporter.email && (
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          📧 {supporter.email}
-                        </span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>📧 {supporter.email}</span>
                       )}
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                         🕒 {new Date(supporter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </div>
-
-                  {/* 右側：削除ボタン */}
                   <button
                     type="button"
                     onClick={() => handleDeleteSupporter(supporter.id)}
                     disabled={deletingId === supporter.id}
-                    style={{
-                      padding: '8px 14px',
-                      background: deletingId === supporter.id ? '#f1f5f9' : '#fef2f2',
-                      border: '1px solid #fecaca',
-                      borderRadius: '8px',
-                      color: deletingId === supporter.id ? '#94a3b8' : '#ef4444',
-                      fontSize: '13px',
-                      cursor: deletingId === supporter.id ? 'not-allowed' : 'pointer',
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                    }}
+                    style={{ padding: '8px 14px', background: deletingId === supporter.id ? '#f1f5f9' : '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: deletingId === supporter.id ? '#94a3b8' : '#ef4444', fontSize: '13px', cursor: deletingId === supporter.id ? 'not-allowed' : 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}
                   >
                     {deletingId === supporter.id ? '削除中...' : '🗑️ 削除'}
                   </button>
@@ -632,4 +598,3 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     </div>
   );
 }
-'@
