@@ -1,4 +1,4 @@
-﻿"use client";
+﻿use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -32,7 +32,7 @@ type Project = {
   status: string;
   goal_amount: number;
   created_at: string;
-  tiers: Tier[] | null; // ← 追加
+  tiers: Tier[] | null;
 };
 
 export default function AdminPage() {
@@ -72,6 +72,7 @@ export default function AdminPage() {
   const [tab,        setTab]        = useState<"supporters" | "projects">("supporters");
   const [filterPrj,  setFilterPrj]  = useState("all");
   const [filterSts,  setFilterSts]  = useState("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuth) fetchAll();
@@ -93,16 +94,33 @@ export default function AdminPage() {
     fetchAll();
   };
 
-  // ── 支援者削除 ──────────────────────────────────────
+  // ── 支援者削除（サーバーサイドAPI経由・RLS回避）──────────────
   const deleteSupporter = async (id: string) => {
     if (!confirm("この支援者データを完全に削除しますか？\nこの操作は取り消せません。")) return;
-    const { error } = await supabase.from("supporters").delete().eq("id", id);
-    if (!error) {
-      setSupporters(prev => prev.filter(s => s.id !== id));
+
+    setDeletingId(id);
+
+    try {
+      const res = await fetch("/api/admin/delete-supporter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (res.ok) {
+        setSupporters(prev => prev.filter(s => s.id !== id));
+      } else {
+        const data = await res.json();
+        alert(`削除失敗: ${data.error ?? "不明なエラー"}`);
+      }
+    } catch {
+      alert("通信エラーが発生しました");
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  // ── 金額補完：amount=0 の場合ティアから取得 ─────────
+  // ── 金額補完 ────────────────────────────────────────────────
   const resolveAmount = (s: Supporter): number => {
     if (s.total_amount && s.total_amount > 0) return s.total_amount;
     const prj = projects.find(p => p.id === s.project_id);
@@ -209,7 +227,6 @@ export default function AdminPage() {
 
   const approvedList = supporters.filter(s => isApproved(s.status));
   const pendingList  = supporters.filter(s => isPending(s.status));
-  // ← resolveAmount で合計を正しく計算
   const totalAmount  = approvedList.reduce((sum, s) => sum + resolveAmount(s), 0);
 
   return (
@@ -282,16 +299,16 @@ export default function AdminPage() {
                     <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>データがありません</td></tr>
                   ) : filtered.map(s => {
                     const prjName = projects.find(p => p.id === s.project_id)?.title ?? s.project_id;
-                    const displayAmount = resolveAmount(s); // ← 金額補完
+                    const displayAmount = resolveAmount(s);
+                    const isDeleting = deletingId === s.id;
                     return (
-                      <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9", opacity: isDeleting ? 0.5 : 1 }}>
                         <td style={{ padding: "10px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>
                           {new Date(s.created_at).toLocaleDateString("ja-JP")}
                         </td>
                         <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.name}</td>
                         <td style={{ padding: "10px 12px" }}>{prjName}</td>
                         <td style={{ padding: "10px 12px" }}>{s.tier}</td>
-                        {/* ← 金額を補完後の値で表示 */}
                         <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>
                           ¥{displayAmount.toLocaleString()}
                         </td>
@@ -305,13 +322,13 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "10px 12px" }}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {!isApproved(s.status)  && (
+                            {!isApproved(s.status) && (
                               <button onClick={() => updateStatus(s.id, "approved")}
                                 style={{ padding: "4px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
                                 承認
                               </button>
                             )}
-                            {!isRejected(s.status)  && (
+                            {!isRejected(s.status) && (
                               <button onClick={() => updateStatus(s.id, "rejected")}
                                 style={{ padding: "4px 10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
                                 却下
@@ -323,10 +340,11 @@ export default function AdminPage() {
                                 取消
                               </button>
                             )}
-                            {/* ← 削除ボタン（新規追加） */}
-                            <button onClick={() => deleteSupporter(s.id)}
-                              style={{ padding: "4px 10px", background: "#1e293b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
-                              🗑️
+                            <button
+                              onClick={() => deleteSupporter(s.id)}
+                              disabled={isDeleting}
+                              style={{ padding: "4px 10px", background: isDeleting ? "#9ca3af" : "#1e293b", color: "#fff", border: "none", borderRadius: 6, cursor: isDeleting ? "not-allowed" : "pointer", fontSize: 12 }}>
+                              {isDeleting ? "削除中..." : "🗑️"}
                             </button>
                           </div>
                         </td>
@@ -371,7 +389,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-
-
-

@@ -57,28 +57,38 @@ const CHAPTER_TITLES = [
 
 const EMPTY_BLOCK: StoryBlock = { title: '', body: '', image_url: '' };
 
-// ── マーカープレビュー描画 ──────────────────────────────────────
+// ── マーカープレビュー描画（行単位で処理・改行またぎ防止）──
 function renderMarkedPreview(text: string): React.ReactNode[] {
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? (
-      <mark
-        key={i}
-        style={{
-          background: '#fef08a',
-          padding: '1px 3px',
-          borderRadius: '3px',
-          fontWeight: 'bold',
-          color: '#78350f',
-        }}
-      >
-        {part}
-      </mark>
-    ) : (
-      <span key={i}>{part}</span>
-    )
-  );
+  const lines = text.split('\n');
+  return lines.map((line, lineIdx) => {
+    const parts = line.split(/\*\*(.*?)\*\*/g);
+    return (
+      <React.Fragment key={lineIdx}>
+        {parts.map((part, i) =>
+          i % 2 === 1 ? (
+            <mark
+              key={i}
+              style={{
+                background: '#fef08a',
+                padding: '1px 3px',
+                borderRadius: '3px',
+                fontWeight: 'bold',
+                color: '#78350f',
+              }}
+            >
+              {part}
+            </mark>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+        {lineIdx < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
 }
+
+import React from 'react';
 
 export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [project, setProject] = useState<Project | null>(null);
@@ -93,7 +103,10 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // ── マーカー用: 各ストーリーブロックの本文textarea参照 ──
+  // ── マーカー用: 選択範囲を保存（ボタンクリック時に選択が外れる問題を防ぐ）──
+  const [savedSelections, setSavedSelections] = useState<Array<{ start: number; end: number }>>(
+    Array.from({ length: 5 }, () => ({ start: 0, end: 0 }))
+  );
   const bodyTextareaRefs = useRef<Array<HTMLTextAreaElement | null>>([
     null, null, null, null, null,
   ]);
@@ -212,13 +225,23 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     });
   };
 
-  // ── マーカーを付ける ──────────────────────────────────────────
+  // ── textareaの選択範囲を保存 ──
+  const saveSelection = (index: number) => {
+    const textarea = bodyTextareaRefs.current[index];
+    if (!textarea) return;
+    setSavedSelections(prev => {
+      const next = [...prev];
+      next[index] = { start: textarea.selectionStart, end: textarea.selectionEnd };
+      return next;
+    });
+  };
+
+  // ── マーカーを付ける ──
   const applyMarker = (index: number) => {
     const textarea = bodyTextareaRefs.current[index];
     if (!textarea) return;
 
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
+    const { start, end } = savedSelections[index];
 
     if (start === end) {
       setMessage('⚠️ テキストを選択してからマーカーボタンを押してください');
@@ -229,7 +252,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     const body = blocks[index].body;
     const selected = body.substring(start, end);
 
-    // 選択範囲がすでに ** で囲まれていたら解除
     if (selected.startsWith('**') && selected.endsWith('**') && selected.length > 4) {
       const unwrapped = selected.slice(2, -2);
       const newBody = body.substring(0, start) + unwrapped + body.substring(end);
@@ -237,6 +259,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
       setTimeout(() => {
         textarea.focus();
         textarea.setSelectionRange(start, start + unwrapped.length);
+        saveSelection(index);
       }, 0);
     } else {
       const newBody = body.substring(0, start) + '**' + selected + '**' + body.substring(end);
@@ -244,19 +267,19 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
       setTimeout(() => {
         textarea.focus();
         textarea.setSelectionRange(start, end + 4);
+        saveSelection(index);
       }, 0);
     }
   };
 
-  // ── カーソル位置のマーカーを解除 ────────────────────────────
+  // ── カーソル位置のマーカーを解除 ──
   const removeMarkerAtCursor = (index: number) => {
     const textarea = bodyTextareaRefs.current[index];
     if (!textarea) return;
 
     const body = blocks[index].body;
-    const cursor = textarea.selectionStart ?? 0;
+    const cursor = savedSelections[index].start;
 
-    // カーソル前の最後の ** を探す
     const before = body.substring(0, cursor);
     const lastOpenIdx = before.lastIndexOf('**');
     if (lastOpenIdx === -1) {
@@ -275,7 +298,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
 
     const closeIdx = lastOpenIdx + 2 + closeOffset;
 
-    // カーソルがマーカーの範囲内かチェック
     if (cursor < lastOpenIdx || cursor > closeIdx + 2) {
       setMessage('⚠️ マーカー内にカーソルを置いてから解除ボタンを押してください');
       setTimeout(() => setMessage(''), 2500);
@@ -289,6 +311,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(lastOpenIdx, lastOpenIdx + inner.length);
+      saveSelection(index);
     }, 0);
   };
 
@@ -506,11 +529,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>現在の画像：</p>
             <div style={{ position: 'relative', width: '100%', aspectRatio: '16/5', overflow: 'hidden', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <img
-                src={project.image_url}
-                alt="ヒーロー画像"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
-              />
+              <img src={project.image_url} alt="ヒーロー画像" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }} />
             </div>
             <button
               type="button"
@@ -525,15 +544,8 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
             画像が設定されていません
           </div>
         )}
-        <input
-          type="file"
-          accept="image/*"
-          ref={heroPhotoRef}
-          style={{ display: 'none' }}
-          onChange={e => {
-            const file = e.target.files?.[0];
-            if (file) handleHeroImageUpload(file);
-          }}
+        <input type="file" accept="image/*" ref={heroPhotoRef} style={{ display: 'none' }}
+          onChange={e => { const file = e.target.files?.[0]; if (file) handleHeroImageUpload(file); }}
         />
         <button
           type="button"
@@ -582,7 +594,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>返礼品の説明</label>
-                  <textarea value={tier.description ?? ''} onChange={e => updateTier(i, 'description', e.target.value)} rows={3} placeholder="返礼品の内容や支援プランの説明を入力してください..." style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
+                  <textarea value={tier.description ?? ''} onChange={e => updateTier(i, 'description', e.target.value)} rows={3} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
                 </div>
               </div>
             </div>
@@ -612,31 +624,18 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
             {supporters.map(supporter => {
               const displayAmount = resolveAmount(supporter);
               return (
-                <div
-                  key={supporter.id}
-                  style={{ background: 'white', borderRadius: '10px', padding: '14px 16px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'center' }}
-                >
+                <div key={supporter.id} style={{ background: 'white', borderRadius: '10px', padding: '14px 16px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'center' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#0f172a' }}>
-                        {supporter.name || '（名前なし）'}
-                      </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#0f172a' }}>{supporter.name || '（名前なし）'}</span>
                       {supporter.tier_name && (
-                        <span style={{ fontSize: '12px', background: '#eff6ff', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', border: '1px solid #bfdbfe' }}>
-                          {supporter.tier_name}
-                        </span>
+                        <span style={{ fontSize: '12px', background: '#eff6ff', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', border: '1px solid #bfdbfe' }}>{supporter.tier_name}</span>
                       )}
-                      <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#16a34a' }}>
-                        ¥{displayAmount.toLocaleString()}
-                      </span>
+                      <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#16a34a' }}>¥{displayAmount.toLocaleString()}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      {supporter.email && (
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>📧 {supporter.email}</span>
-                      )}
-                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        🕐 {new Date(supporter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      {supporter.email && <span style={{ fontSize: '12px', color: '#64748b' }}>📧 {supporter.email}</span>}
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>🕐 {new Date(supporter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
                   <button
@@ -661,21 +660,12 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         </h2>
 
         {/* マーカー使い方ガイド */}
-        <div style={{
-          background: '#fffbeb',
-          border: '1px solid #fcd34d',
-          borderRadius: '10px',
-          padding: '12px 16px',
-          marginBottom: '20px',
-          fontSize: '13px',
-          color: '#92400e',
-          lineHeight: '1.7',
-        }}>
+        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', fontSize: '13px', color: '#92400e', lineHeight: '1.7' }}>
           <strong>🖊️ マーカー機能の使い方</strong><br />
-          ① 本文テキストエリアでハイライトしたい文字を<strong>ドラッグして選択</strong><br />
-          ② 上の <strong style={{ background: '#fef08a', padding: '1px 6px', borderRadius: '3px' }}>🖊️ マーカー</strong> ボタンをクリック → <code>**テキスト**</code> に変換されます<br />
-          ③ 解除したい場合はマーカー内にカーソルを置いて <strong>✕ 解除</strong> をクリック<br />
-          ④ 下のプレビューで黄色ハイライト表示を確認できます
+          ① 本文テキストエリアでハイライトしたい文字を<strong>ドラッグして選択</strong>（選択したままにする）<br />
+          ② <strong style={{ background: '#fef08a', padding: '1px 6px', borderRadius: '3px' }}>🖊️ マーカー</strong> ボタンをクリック → <code>**テキスト**</code> に変換<br />
+          ③ 解除はマーカー内にカーソルを置いて <strong>✕ 解除</strong> をクリック<br />
+          ④ 下のプレビューで黄色ハイライト確認
         </div>
 
         {blocks.map((block, i) => (
@@ -684,9 +674,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               <span style={{ background: 'linear-gradient(135deg, #1e3a5f, #2563eb)', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', flexShrink: 0 }}>
                 {i + 1}
               </span>
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
-                {CHAPTER_TITLES[i]}
-              </h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>{CHAPTER_TITLES[i]}</h3>
             </div>
             <div style={{ display: 'grid', gap: '12px' }}>
               {/* 見出し */}
@@ -705,65 +693,23 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>本文</label>
 
-                {/* ── マーカーツールバー ── */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '6px',
-                  padding: '8px 10px',
-                  background: '#fffbeb',
-                  border: '1px solid #fcd34d',
-                  borderRadius: '8px 8px 0 0',
-                  borderBottom: 'none',
-                }}>
+                {/* マーカーツールバー */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px 8px 0 0', borderBottom: 'none' }}>
                   <button
                     type="button"
-                    onMouseDown={e => {
-                      // onMouseDown + preventDefault でtextareaのfocusを維持したまま実行
-                      e.preventDefault();
-                      applyMarker(i);
-                    }}
-                    style={{
-                      padding: '5px 14px',
-                      background: '#fef08a',
-                      border: '1px solid #f59e0b',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      color: '#78350f',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
+                    onClick={() => applyMarker(i)}
+                    style={{ padding: '5px 14px', background: '#fef08a', border: '1px solid #f59e0b', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', color: '#78350f' }}
                   >
                     🖊️ マーカー
                   </button>
                   <button
                     type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      removeMarkerAtCursor(i);
-                    }}
-                    style={{
-                      padding: '5px 14px',
-                      background: '#f1f5f9',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      color: '#475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
+                    onClick={() => removeMarkerAtCursor(i)}
+                    style={{ padding: '5px 14px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', color: '#475569' }}
                   >
                     ✕ 解除
                   </button>
-                  <span style={{ fontSize: '12px', color: '#a16207', marginLeft: '4px' }}>
-                    テキストを選択 → マーカーボタン
-                  </span>
+                  <span style={{ fontSize: '12px', color: '#a16207' }}>選択 → マーカー</span>
                 </div>
 
                 {/* 本文 textarea */}
@@ -771,43 +717,19 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
                   ref={el => { bodyTextareaRefs.current[i] = el; }}
                   value={block.body}
                   onChange={e => updateBlock(i, 'body', e.target.value)}
+                  onSelect={() => saveSelection(i)}
+                  onMouseUp={() => saveSelection(i)}
+                  onKeyUp={() => saveSelection(i)}
                   rows={6}
                   placeholder="この章の内容を入力してください..."
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #fcd34d',
-                    borderRadius: '0 0 8px 8px',
-                    fontSize: '15px',
-                    boxSizing: 'border-box',
-                    resize: 'vertical',
-                    fontFamily: 'monospace',
-                    lineHeight: '1.7',
-                  }}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #fcd34d', borderRadius: '0 0 8px 8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'monospace', lineHeight: '1.7' }}
                 />
 
-                {/* プレビュー（** が含まれる場合のみ表示） */}
+                {/* プレビュー */}
                 {block.body.includes('**') && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '12px 14px',
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    lineHeight: '1.8',
-                  }}>
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#94a3b8',
-                      marginBottom: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}>
-                      📋 プレビュー
-                    </div>
-                    <div style={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
+                  <div style={{ marginTop: '8px', padding: '12px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', lineHeight: '1.8' }}>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>📋 プレビュー</div>
+                    <div style={{ color: '#1e293b' }}>
                       {renderMarkedPreview(block.body)}
                     </div>
                   </div>
@@ -818,25 +740,12 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>画像</label>
                 {block.image_url && (
-                  <img
-                    src={block.image_url}
-                    alt={`ブロック${i + 1}`}
-                    style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '8px' }}
-                  />
+                  <img src={block.image_url} alt={`ブロック${i + 1}`} style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '8px' }} />
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={photoRefs[i]}
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(i, file);
-                  }}
+                <input type="file" accept="image/*" ref={photoRefs[i]} style={{ display: 'none' }}
+                  onChange={e => { const file = e.target.files?.[0]; if (file) handleImageUpload(i, file); }}
                 />
-                <button
-                  type="button"
-                  onClick={() => photoRefs[i].current?.click()}
+                <button type="button" onClick={() => photoRefs[i].current?.click()}
                   style={{ padding: '8px 16px', background: 'white', border: '2px dashed #94a3b8', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', color: '#64748b', width: '100%' }}
                 >
                   📁 画像をアップロード
