@@ -251,7 +251,7 @@ export default function ProjectDetail() {
 
         {project.image_url && (
           <div style={{ width: '100%', aspectRatio: '16/6', overflow: 'hidden', position: 'relative' }}>
-            <img src={project.image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 10%' }} />
+            <img src={project.image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%)' }} />
             <div style={{
               position: 'absolute', top: 16, right: 16, padding: '6px 16px',
