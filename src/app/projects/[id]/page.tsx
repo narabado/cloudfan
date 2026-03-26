@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -123,6 +123,14 @@ export default function ProjectDetail() {
   const [error,       setError]       = useState('');
   const [activeTab,   setActiveTab]   = useState<'story' | 'tiers' | 'supporters' | 'ranking'>('story');
   const [copied,      setCopied]      = useState(false);
+  const [isMobile,    setIsMobile]    = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -206,10 +214,10 @@ export default function ProjectDetail() {
   };
 
   const tabStyle = (tab: string): React.CSSProperties => ({
-    padding: '12px 20px',
+    padding: isMobile ? '9px 11px' : '12px 20px',
     border: activeTab === tab ? 'none' : '2px solid #e2e8f0',
     cursor: 'pointer',
-    fontSize: 14,
+    fontSize: isMobile ? 11 : 14,
     fontWeight: 800,
     borderRadius: '10px 10px 0 0',
     background: activeTab === tab ? 'linear-gradient(135deg, #1a2e4a, #2563eb)' : '#fff',
@@ -219,6 +227,8 @@ export default function ProjectDetail() {
     transform: activeTab === tab ? 'translateY(-2px)' : 'none',
     position: 'relative' as const,
     zIndex: activeTab === tab ? 2 : 1,
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
   });
 
   return (
@@ -226,24 +236,26 @@ export default function ProjectDetail() {
       <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: '#f8fafc', minHeight: '100vh' }}>
 
         <nav style={{
-          background: '#1a2e4a', padding: '0 24px',
+          background: '#1a2e4a', padding: isMobile ? '0 12px' : '0 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           height: 64, position: 'sticky', top: 0, zIndex: 100,
           boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
         }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-            <img src="/logo.png" alt="CloudFan" style={{ height: 36 }}
+            <img src="/logo.png" alt="CloudFan" style={{ height: isMobile ? 28 : 36 }}
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-            <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>CloudFan</span>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: isMobile ? 15 : 18 }}>CloudFan</span>
           </Link>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: isMobile ? 6 : 10, alignItems: 'center' }}>
             <Link href="/" style={{
-              color: '#fff', padding: '8px 18px', fontSize: 14, textDecoration: 'none',
+              color: '#fff', padding: isMobile ? '6px 10px' : '8px 18px',
+              fontSize: isMobile ? 12 : 14, textDecoration: 'none',
               border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: 8,
               fontWeight: 700, background: 'rgba(255,255,255,0.08)',
-            }}>← トップへ戻る</Link>
+            }}>{isMobile ? '← 戻る' : '← トップへ戻る'}</Link>
             <Link href="/admin" style={{
-              color: '#1a2e4a', padding: '8px 18px', fontSize: 13, textDecoration: 'none',
+              color: '#1a2e4a', padding: isMobile ? '6px 10px' : '8px 18px',
+              fontSize: isMobile ? 12 : 13, textDecoration: 'none',
               background: '#d4af37', borderRadius: 8, fontWeight: 700,
             }}>管理</Link>
           </div>
@@ -261,7 +273,13 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
+        <div style={{
+          maxWidth: 1100, margin: '0 auto',
+          padding: isMobile ? '16px 12px' : '24px 16px',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 340px',
+          gap: isMobile ? 20 : 32,
+        }}>
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {([project.school, project.club, project.region] as string[]).filter(Boolean).map((t, i) => (
@@ -272,11 +290,11 @@ export default function ProjectDetail() {
               )}
             </div>
 
-            <h1 style={{ fontSize: 26, color: '#0f172a', marginBottom: 12, lineHeight: 1.5, fontWeight: 900 }}>{project.title}</h1>
-            <p style={{ color: '#475569', fontSize: 15, lineHeight: 1.9, marginBottom: 20 }}>{project.description}</p>
+            <h1 style={{ fontSize: isMobile ? 20 : 26, color: '#0f172a', marginBottom: 12, lineHeight: 1.5, fontWeight: 900, wordBreak: 'break-word' }}>{project.title}</h1>
+            <p style={{ color: '#475569', fontSize: isMobile ? 14 : 15, lineHeight: 1.9, marginBottom: 20, wordBreak: 'break-word' }}>{project.description}</p>
 
             {project.deadline && (
-              <div style={{ marginBottom: 16, padding: '10px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginBottom: 16, padding: '10px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>📅</span>
                 <span style={{ color: '#166534', fontSize: 14, fontWeight: 700 }}>
                   締切: {new Date(project.deadline).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -286,18 +304,22 @@ export default function ProjectDetail() {
             )}
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
-              <button onClick={copyUrl} style={{ padding: '8px 18px', background: copied ? '#059669' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              <button onClick={copyUrl} style={{ padding: isMobile ? '7px 12px' : '8px 18px', background: copied ? '#059669' : '#1a2e4a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                 {copied ? '✅ コピー完了' : '🔗 URLをコピー'}
               </button>
               <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(project.title)}&url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
                 target="_blank" rel="noreferrer"
-                style={{ padding: '8px 18px', background: '#000', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>𝕏 シェア</a>
+                style={{ padding: isMobile ? '7px 12px' : '8px 18px', background: '#000', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>𝕏 シェア</a>
               <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
                 target="_blank" rel="noreferrer"
-                style={{ padding: '8px 18px', background: '#00b900', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>LINE</a>
+                style={{ padding: isMobile ? '7px 12px' : '8px 18px', background: '#00b900', color: '#fff', borderRadius: 8, fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>LINE</a>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, marginBottom: 0, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{
+              display: 'flex', gap: 6, marginBottom: 0, alignItems: 'flex-end',
+              overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 2,
+              msOverflowStyle: 'none' as any, scrollbarWidth: 'none' as any,
+            }}>
               {([
                 { key: 'story',      label: '📖 ストーリー' },
                 { key: 'tiers',      label: '💎 支援プラン' },
@@ -311,7 +333,7 @@ export default function ProjectDetail() {
             </div>
 
             <div style={{
-              background: '#fff', padding: 28,
+              background: '#fff', padding: isMobile ? 16 : 28,
               borderRadius: '0 8px 8px 8px',
               boxShadow: '0 2px 16px rgba(0,0,0,0.08)', minHeight: 200,
               border: '1px solid #e2e8f0',
@@ -327,14 +349,20 @@ export default function ProjectDetail() {
                       <h3 style={{
                         background: 'linear-gradient(135deg, #1a2e4a, #2563eb)',
                         color: '#fff', padding: '12px 20px',
-                        borderRadius: 10, marginBottom: 20, fontSize: 16,
-                        fontWeight: 800,
+                        borderRadius: 10, marginBottom: 20, fontSize: isMobile ? 14 : 16,
+                        fontWeight: 800, wordBreak: 'break-word',
                       }}>{block.title || CHAPTER_TITLES[i] || `第${i + 1}章`}</h3>
                       {block.image_url && (
                         <img src={block.image_url} alt={`story-${i}`}
-                          style={{ width: '100%', objectFit: 'contain', maxHeight: '450px', display: 'block', margin: '0 auto', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block', marginBottom: 20 }} />
+                          style={{
+                            width: '100%', objectFit: 'contain',
+                            maxHeight: isMobile ? '280px' : '450px',
+                            display: 'block',
+                            marginLeft: 'auto', marginRight: 'auto', marginBottom: 20,
+                            borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                          }} />
                       )}
-                      <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap' }}>{block.body}</p>
+                      <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{block.body}</p>
                     </div>
                   ))}
                   {ytId && (
@@ -348,14 +376,14 @@ export default function ProjectDetail() {
                     </div>
                   )}
                   {!ended && (
-                    <div style={{ marginTop: 40, padding: 24, background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)', borderRadius: 12, textAlign: 'center', border: '1px solid #bfdbfe' }}>
-                      <p style={{ color: '#1a2e4a', fontWeight: 800, fontSize: 16, marginBottom: 8 }}>⏳ このプロジェクトを応援しませんか？</p>
+                    <div style={{ marginTop: 40, padding: isMobile ? 16 : 24, background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)', borderRadius: 12, textAlign: 'center', border: '1px solid #bfdbfe' }}>
+                      <p style={{ color: '#1a2e4a', fontWeight: 800, fontSize: isMobile ? 14 : 16, marginBottom: 8 }}>⏳ このプロジェクトを応援しませんか？</p>
                       <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>あなたの支援が選手たちの夢を実現します。</p>
                       <button onClick={() => setActiveTab('tiers')} style={{
-                        padding: '14px 48px',
+                        padding: isMobile ? '12px 32px' : '14px 48px',
                         background: 'linear-gradient(135deg, #d4af37, #f5d060)',
                         color: '#1a2e4a', border: 'none', borderRadius: 40,
-                        fontWeight: 800, fontSize: 16, cursor: 'pointer',
+                        fontWeight: 800, fontSize: isMobile ? 14 : 16, cursor: 'pointer',
                         boxShadow: '0 4px 16px rgba(212,175,55,0.4)',
                       }}>💎 支援プランを見る →</button>
                     </div>
@@ -373,15 +401,15 @@ export default function ProjectDetail() {
                     const tierId = String(tier.id ?? i);
                     return (
                       <div key={tierId} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
-                        <div style={{ background: c, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ background: c, padding: isMobile ? '12px 14px' : '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <span style={{ background: 'rgba(255,255,255,0.3)', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 14 }}>{i + 1}</span>
-                            <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>{tier.name}</span>
+                            <span style={{ color: '#fff', fontWeight: 800, fontSize: isMobile ? 15 : 17 }}>{tier.name}</span>
                           </div>
-                          <span style={{ color: '#fff', fontWeight: 900, fontSize: 20 }}>¥{(Number(tier.amount) || 0).toLocaleString()}</span>
+                          <span style={{ color: '#fff', fontWeight: 900, fontSize: isMobile ? 16 : 20, flexShrink: 0 }}>¥{(Number(tier.amount) || 0).toLocaleString()}</span>
                         </div>
-                        <div style={{ padding: '18px 20px', background: '#fff' }}>
-                          <p style={{ color: '#334155', fontSize: 14, lineHeight: 1.9, marginBottom: 14 }}>{tier.description}</p>
+                        <div style={{ padding: isMobile ? '14px' : '18px 20px', background: '#fff' }}>
+                          <p style={{ color: '#334155', fontSize: 14, lineHeight: 1.9, marginBottom: 14, wordBreak: 'break-word' }}>{tier.description}</p>
                           {tier.limit != null && (
                             <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b', marginBottom: 18 }}>
                               <span>📦 残り {tier.remaining ?? tier.limit} 枠</span>
@@ -419,13 +447,13 @@ export default function ProjectDetail() {
                     return (
                       <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
                         <div style={{ width: 44, height: 44, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{icon}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14 }}>{String(s['name'] || s['名前'] || '名前未設定')}</span>
-                            <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16 }}>¥{amount.toLocaleString()}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(s['name'] || s['名前'] || '名前未設定')}</span>
+                            <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16, flexShrink: 0 }}>¥{amount.toLocaleString()}</span>
                           </div>
                           {s['message'] && (
-                            <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>{String(s['message'])}</p>
+                            <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7, wordBreak: 'break-word' }}>{String(s['message'])}</p>
                           )}
                           <span style={{ color: '#94a3b8', fontSize: 11 }}>
                             {s['created_at'] ? new Date(String(s['created_at'])).toLocaleDateString('ja-JP') : ''}
@@ -475,7 +503,7 @@ export default function ProjectDetail() {
                     const tierBg   = getTierBg(amount);
                     return (
                       <div key={String(s['id'] || idx)} style={{
-                        display: 'flex', gap: 16, padding: '16px 20px', marginBottom: 12,
+                        display: 'flex', gap: 16, padding: isMobile ? '12px' : '16px 20px', marginBottom: 12,
                         borderRadius: 12, alignItems: 'center',
                         background: isTop3
                           ? idx === 0 ? 'linear-gradient(135deg, #fef9c3, #fef3c7)'
@@ -491,7 +519,7 @@ export default function ProjectDetail() {
                           : '1px solid #e2e8f0',
                       }}>
                         <div style={{
-                          width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                          width: isMobile ? 44 : 56, height: isMobile ? 44 : 56, borderRadius: '50%', flexShrink: 0,
                           background: isTop3
                             ? idx === 0 ? 'linear-gradient(135deg, #f59e0b, #fbbf24, #ffe066)'
                             : idx === 1 ? 'linear-gradient(135deg, #64748b, #94a3b8, #d0d8e0)'
@@ -523,17 +551,17 @@ export default function ProjectDetail() {
                             </div>
                           ) : isTop10 ? tierIcon : `${idx + 1}`}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 800, color: '#1a2e4a', fontSize: isTop3 ? 16 : 14 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 800, color: '#1a2e4a', fontSize: isTop3 ? (isMobile ? 14 : 16) : 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {String(s['name'] || s['名前'] || '匿名サポーター')}
                             </span>
-                            <span style={{ fontWeight: 900, fontSize: isTop3 ? 22 : 16, color: idx === 0 ? '#d97706' : idx === 1 ? '#64748b' : idx === 2 ? '#ea580c' : '#2563eb' }}>
+                            <span style={{ fontWeight: 900, fontSize: isTop3 ? (isMobile ? 18 : 22) : 16, color: idx === 0 ? '#d97706' : idx === 1 ? '#64748b' : idx === 2 ? '#ea580c' : '#2563eb', flexShrink: 0 }}>
                               ¥{amount.toLocaleString()}
                             </span>
                           </div>
                           {s['message'] && (
-                            <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7 }}>💬 {String(s['message'])}</p>
+                            <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0', lineHeight: 1.7, wordBreak: 'break-word' }}>💬 {String(s['message'])}</p>
                           )}
                         </div>
                       </div>
@@ -545,7 +573,12 @@ export default function ProjectDetail() {
           </div>
 
           <div>
-            <div style={{ background: '#fff', borderRadius: 18, padding: 24, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'sticky', top: 80, border: '1px solid #e2e8f0' }}>
+            <div style={{
+              background: '#fff', borderRadius: 18, padding: 24,
+              boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+              position: isMobile ? 'static' : 'sticky',
+              top: 80, border: '1px solid #e2e8f0',
+            }}>
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                   <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>達成率</span>

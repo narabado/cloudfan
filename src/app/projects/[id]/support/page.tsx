@@ -355,9 +355,9 @@ export default function SupportPage() {
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100 }} />
       <FireworksCanvas tierName={effectiveTier?.name ?? 'ブロンズ'} active={showFireworks} zIndex={101} />
       <div style={{ position: 'fixed', inset: 0, zIndex: 102, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <div style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(24px)', border: `2px solid ${effStyle.glow}`, borderRadius: 24, padding: '48px 36px', textAlign: 'center', maxWidth: 480, width: '100%', boxShadow: `0 20px 80px rgba(0,0,0,0.6), 0 0 40px ${effStyle.glow}40` }}>
+        <div style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(24px)', border: `2px solid ${effStyle.glow}`, borderRadius: 24, padding: '28px 20px', textAlign: 'center', maxWidth: 480, width: '100%', boxShadow: `0 20px 80px rgba(0,0,0,0.6), 0 0 40px ${effStyle.glow}40` }}>
           <div style={{ fontSize: 72, marginBottom: 16 }}>{effStyle.icon}</div>
-          <h1 style={{ color: effStyle.glow, fontSize: 28, fontWeight: 800, marginBottom: 8 }}>ありがとうございます！</h1>
+          <h1 style={{ color: effStyle.glow, fontSize: 24, fontWeight: 800, marginBottom: 8, wordBreak: 'break-word' }}>ありがとうございます！</h1>
           <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 15, marginBottom: 4 }}>{project?.title ?? ''} への支援が完了しました</p>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20 }}>{project?.school} {project?.club}</p>
           <div style={{ margin: '24px 0', background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 16 }}>
@@ -424,8 +424,8 @@ export default function SupportPage() {
 
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(16px)', borderBottom: `2px solid ${selStyle.glow}80`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.85)', border: `1.5px solid ${selStyle.glow}`, borderRadius: 8, color: textColor, padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>← 戻る</button>
-        <div style={{ flex: 1 }}>
-          <div style={{ color: textColor, fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{project?.title}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: textColor, fontWeight: 700, fontSize: 15, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project?.title}</div>
           <div style={{ color: subTextColor, fontSize: 11 }}>{project?.school} / {project?.club}</div>
         </div>
       </nav>
