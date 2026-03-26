@@ -216,7 +216,7 @@ export default function TopPage() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 28 }}>
             {projects.map((p) => {
               const raised   = raisedAmounts[p.id]   ?? 0;
-              const goal     = Number(p.goal_amount)  || 0;
+              const goal = Number((p as any)['目的'] ?? (p as any)['goal'] ?? p.goal_amount ?? 0) || 0;
               const pct      = goal > 0 ? Math.min(100, Math.round(raised / goal * 100)) : 0;
               const daysLeft = calcDaysLeft(p.deadline);
               const count    = supporterCounts[p.id] ?? 0;
