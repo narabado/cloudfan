@@ -49,13 +49,36 @@ interface Supporter {
 
 const CHAPTER_TITLES = [
   '🔥 なぜ今、支援が必要なのか',
-  '🏆 私たちの挑戦と夢',
+  '🏸 私たちの挑戦と夢',
   '💰 支援金の具体的な使い道',
-  '🌟 あなたの支援で変わること',
+  '✨ あなたの支援で変わること',
   '💌 チームからのメッセージ',
 ];
 
 const EMPTY_BLOCK: StoryBlock = { title: '', body: '', image_url: '' };
+
+// ── マーカープレビュー描画 ──────────────────────────────────────
+function renderMarkedPreview(text: string): React.ReactNode[] {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark
+        key={i}
+        style={{
+          background: '#fef08a',
+          padding: '1px 3px',
+          borderRadius: '3px',
+          fontWeight: 'bold',
+          color: '#78350f',
+        }}
+      >
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
 
 export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [project, setProject] = useState<Project | null>(null);
@@ -69,6 +92,11 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [heroUploading, setHeroUploading] = useState(false);
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ── マーカー用: 各ストーリーブロックの本文textarea参照 ──
+  const bodyTextareaRefs = useRef<Array<HTMLTextAreaElement | null>>([
+    null, null, null, null, null,
+  ]);
 
   const heroPhotoRef = useRef<HTMLInputElement>(null);
   const photoRefs = [
@@ -143,7 +171,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   };
 
   const handleDeleteSupporter = async (supporterId: string) => {
-    if (!confirm('この支援者データを削除しますか？この操作は取り消せません。')) return;
+    if (!confirm('この支援者のデータを削除しますか？この操作は取り消せません。')) return;
     setDeletingId(supporterId);
     const { error } = await supabase
       .from('supporters')
@@ -155,7 +183,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
       setMessage(`削除失敗: ${error.message}`);
     } else {
       setSupporters(prev => prev.filter(s => s.id !== supporterId));
-      setMessage('✅ 支援者データを削除しました');
+      setMessage('✅ 支援者のデータを削除しました');
     }
   };
 
@@ -182,6 +210,86 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
       next[index] = { ...next[index], [field]: value };
       return next;
     });
+  };
+
+  // ── マーカーを付ける ──────────────────────────────────────────
+  const applyMarker = (index: number) => {
+    const textarea = bodyTextareaRefs.current[index];
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+
+    if (start === end) {
+      setMessage('⚠️ テキストを選択してからマーカーボタンを押してください');
+      setTimeout(() => setMessage(''), 2500);
+      return;
+    }
+
+    const body = blocks[index].body;
+    const selected = body.substring(start, end);
+
+    // 選択範囲がすでに ** で囲まれていたら解除
+    if (selected.startsWith('**') && selected.endsWith('**') && selected.length > 4) {
+      const unwrapped = selected.slice(2, -2);
+      const newBody = body.substring(0, start) + unwrapped + body.substring(end);
+      updateBlock(index, 'body', newBody);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start, start + unwrapped.length);
+      }, 0);
+    } else {
+      const newBody = body.substring(0, start) + '**' + selected + '**' + body.substring(end);
+      updateBlock(index, 'body', newBody);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start, end + 4);
+      }, 0);
+    }
+  };
+
+  // ── カーソル位置のマーカーを解除 ────────────────────────────
+  const removeMarkerAtCursor = (index: number) => {
+    const textarea = bodyTextareaRefs.current[index];
+    if (!textarea) return;
+
+    const body = blocks[index].body;
+    const cursor = textarea.selectionStart ?? 0;
+
+    // カーソル前の最後の ** を探す
+    const before = body.substring(0, cursor);
+    const lastOpenIdx = before.lastIndexOf('**');
+    if (lastOpenIdx === -1) {
+      setMessage('⚠️ 解除できるマーカーが見つかりません（マーカー内にカーソルを置いてください）');
+      setTimeout(() => setMessage(''), 2500);
+      return;
+    }
+
+    const afterOpen = body.substring(lastOpenIdx + 2);
+    const closeOffset = afterOpen.indexOf('**');
+    if (closeOffset === -1) {
+      setMessage('⚠️ マーカーの閉じタグが見つかりません');
+      setTimeout(() => setMessage(''), 2500);
+      return;
+    }
+
+    const closeIdx = lastOpenIdx + 2 + closeOffset;
+
+    // カーソルがマーカーの範囲内かチェック
+    if (cursor < lastOpenIdx || cursor > closeIdx + 2) {
+      setMessage('⚠️ マーカー内にカーソルを置いてから解除ボタンを押してください');
+      setTimeout(() => setMessage(''), 2500);
+      return;
+    }
+
+    const inner = body.substring(lastOpenIdx + 2, closeIdx);
+    const newBody = body.substring(0, lastOpenIdx) + inner + body.substring(closeIdx + 2);
+    updateBlock(index, 'body', newBody);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(lastOpenIdx, lastOpenIdx + inner.length);
+    }, 0);
   };
 
   const handleHeroImageUpload = async (file: File) => {
@@ -301,9 +409,9 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           padding: '12px 16px',
           borderRadius: '8px',
           marginBottom: '24px',
-          background: message.includes('失敗') ? '#fef2f2' : '#f0fdf4',
-          color: message.includes('失敗') ? '#ef4444' : '#16a34a',
-          border: `1px solid ${message.includes('失敗') ? '#fecaca' : '#bbf7d0'}`,
+          background: message.includes('失敗') || message.includes('⚠️') ? '#fef2f2' : '#f0fdf4',
+          color: message.includes('失敗') || message.includes('⚠️') ? '#ef4444' : '#16a34a',
+          border: `1px solid ${message.includes('失敗') || message.includes('⚠️') ? '#fecaca' : '#bbf7d0'}`,
         }}>
           {message}
         </div>
@@ -342,7 +450,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>目標金額 (円)</label>
+              <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>目標金額（円）</label>
               <input
                 type="number"
                 value={project.goal ?? 0}
@@ -380,7 +488,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               <option value="準備中">準備中</option>
               <option value="募集中">募集中</option>
               <option value="終了">終了</option>
-              <option value="closed">closed（終了）</option>
+              <option value="closed">closed（完全終了）</option>
             </select>
           </div>
         </div>
@@ -433,7 +541,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           disabled={heroUploading}
           style={{ width: '100%', padding: '12px', background: heroUploading ? '#e2e8f0' : 'white', border: '2px dashed #60a5fa', borderRadius: '8px', cursor: heroUploading ? 'not-allowed' : 'pointer', fontSize: '15px', color: heroUploading ? '#94a3b8' : '#2563eb', fontWeight: 'bold', marginBottom: '12px' }}
         >
-          {heroUploading ? '⏳ アップロード中...' : '📷 新しい画像をアップロード'}
+          {heroUploading ? '⏳ アップロード中...' : '📁 新しい画像をアップロード'}
         </button>
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>または画像URLを直接入力</label>
@@ -469,11 +577,11 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
                   <input type="text" value={tier.name ?? ''} onChange={e => updateTier(i, 'name', e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>金額 (円)</label>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>金額（円）</label>
                   <input type="number" value={tier.amount ?? 0} onChange={e => updateTier(i, 'amount', Number(e.target.value))} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>返礼品・説明</label>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>返礼品の説明</label>
                   <textarea value={tier.description ?? ''} onChange={e => updateTier(i, 'description', e.target.value)} rows={3} placeholder="返礼品の内容や支援プランの説明を入力してください..." style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
                 </div>
               </div>
@@ -527,7 +635,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
                         <span style={{ fontSize: '12px', color: '#64748b' }}>📧 {supporter.email}</span>
                       )}
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        🕒 {new Date(supporter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        🕐 {new Date(supporter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </div>
@@ -546,11 +654,30 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         )}
       </section>
 
-      {/* ストーリーブロック */}
+      {/* ストーリーブロック ── マーカー機能付き */}
       <section style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#1e3a5f' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: '#1e3a5f' }}>
           📖 ストーリー（5章）
         </h2>
+
+        {/* マーカー使い方ガイド */}
+        <div style={{
+          background: '#fffbeb',
+          border: '1px solid #fcd34d',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          marginBottom: '20px',
+          fontSize: '13px',
+          color: '#92400e',
+          lineHeight: '1.7',
+        }}>
+          <strong>🖊️ マーカー機能の使い方</strong><br />
+          ① 本文テキストエリアでハイライトしたい文字を<strong>ドラッグして選択</strong><br />
+          ② 上の <strong style={{ background: '#fef08a', padding: '1px 6px', borderRadius: '3px' }}>🖊️ マーカー</strong> ボタンをクリック → <code>**テキスト**</code> に変換されます<br />
+          ③ 解除したい場合はマーカー内にカーソルを置いて <strong>✕ 解除</strong> をクリック<br />
+          ④ 下のプレビューで黄色ハイライト表示を確認できます
+        </div>
+
         {blocks.map((block, i) => (
           <div key={i} style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '16px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -562,22 +689,157 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               </h3>
             </div>
             <div style={{ display: 'grid', gap: '12px' }}>
+              {/* 見出し */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>見出し（任意）</label>
-                <input type="text" value={block.title} onChange={e => updateBlock(i, 'title', e.target.value)} placeholder={CHAPTER_TITLES[i]} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }} />
+                <input
+                  type="text"
+                  value={block.title}
+                  onChange={e => updateBlock(i, 'title', e.target.value)}
+                  placeholder={CHAPTER_TITLES[i]}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
+                />
               </div>
+
+              {/* 本文 ── マーカーツールバー付き */}
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>本文</label>
-                <textarea value={block.body} onChange={e => updateBlock(i, 'body', e.target.value)} rows={5} placeholder="この章の内容を入力してください..." style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
+                <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>本文</label>
+
+                {/* ── マーカーツールバー ── */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '6px',
+                  padding: '8px 10px',
+                  background: '#fffbeb',
+                  border: '1px solid #fcd34d',
+                  borderRadius: '8px 8px 0 0',
+                  borderBottom: 'none',
+                }}>
+                  <button
+                    type="button"
+                    onMouseDown={e => {
+                      // onMouseDown + preventDefault でtextareaのfocusを維持したまま実行
+                      e.preventDefault();
+                      applyMarker(i);
+                    }}
+                    style={{
+                      padding: '5px 14px',
+                      background: '#fef08a',
+                      border: '1px solid #f59e0b',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#78350f',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    🖊️ マーカー
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      removeMarkerAtCursor(i);
+                    }}
+                    style={{
+                      padding: '5px 14px',
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      color: '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    ✕ 解除
+                  </button>
+                  <span style={{ fontSize: '12px', color: '#a16207', marginLeft: '4px' }}>
+                    テキストを選択 → マーカーボタン
+                  </span>
+                </div>
+
+                {/* 本文 textarea */}
+                <textarea
+                  ref={el => { bodyTextareaRefs.current[i] = el; }}
+                  value={block.body}
+                  onChange={e => updateBlock(i, 'body', e.target.value)}
+                  rows={6}
+                  placeholder="この章の内容を入力してください..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '0 0 8px 8px',
+                    fontSize: '15px',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    fontFamily: 'monospace',
+                    lineHeight: '1.7',
+                  }}
+                />
+
+                {/* プレビュー（** が含まれる場合のみ表示） */}
+                {block.body.includes('**') && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '12px 14px',
+                    background: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    lineHeight: '1.8',
+                  }}>
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#94a3b8',
+                      marginBottom: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}>
+                      📋 プレビュー
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
+                      {renderMarkedPreview(block.body)}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* 画像 */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>画像</label>
                 {block.image_url && (
-                  <img src={block.image_url} alt={`ブロック${i + 1}`} style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '8px' }} />
+                  <img
+                    src={block.image_url}
+                    alt={`ブロック${i + 1}`}
+                    style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '8px' }}
+                  />
                 )}
-                <input type="file" accept="image/*" ref={photoRefs[i]} style={{ display: 'none' }} onChange={e => { const file = e.target.files?.[0]; if (file) handleImageUpload(i, file); }} />
-                <button type="button" onClick={() => photoRefs[i].current?.click()} style={{ padding: '8px 16px', background: 'white', border: '2px dashed #94a3b8', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', color: '#64748b', width: '100%' }}>
-                  📷 画像をアップロード
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={photoRefs[i]}
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(i, file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => photoRefs[i].current?.click()}
+                  style={{ padding: '8px 16px', background: 'white', border: '2px dashed #94a3b8', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', color: '#64748b', width: '100%' }}
+                >
+                  📁 画像をアップロード
                 </button>
               </div>
             </div>
