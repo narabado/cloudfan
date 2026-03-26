@@ -31,7 +31,7 @@ type Project = {
 export default function AdminPage() {
   const router = useRouter();
 
-  // 笏笏 隱崎ｨｼ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  // 認証
   const [isAuth,    setIsAuth]    = useState(false);
   const [password,  setPassword]  = useState("");
   const [authError, setAuthError] = useState("");
@@ -49,7 +49,7 @@ export default function AdminPage() {
       setIsAuth(true);
       setAuthError("");
     } else {
-      setAuthError("笶・繝代せ繝ｯ繝ｼ繝峨′驕輔＞縺ｾ縺・);
+      setAuthError("パスワードが違います");
       setPassword("");
     }
   };
@@ -60,7 +60,7 @@ export default function AdminPage() {
     router.push("/");
   };
 
-  // 笏笏 繝・・繧ｿ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  // データ
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [projects,   setProjects]   = useState<Project[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -88,16 +88,16 @@ export default function AdminPage() {
     fetchAll();
   };
 
-  const isApproved  = (s: string) => ["approved",  "謇ｿ隱・,   "謇ｿ隱肴ｸ医∩"].includes(s);
-  const isPending   = (s: string) => ["pending",   "譛ｪ謇ｿ隱・, "譛ｪ蜃ｦ逅・, ""].includes(s);
-  const isRejected  = (s: string) => ["rejected",  "蜊ｴ荳・].includes(s);
-  const isCancelled = (s: string) => ["cancelled", "繧ｭ繝｣繝ｳ繧ｻ繝ｫ"].includes(s);
+  const isApproved  = (s: string) => ["approved",  "承認", "承認済み"].includes(s);
+  const isPending   = (s: string) => ["pending",   "未承認", "未処理", ""].includes(s);
+  const isRejected  = (s: string) => ["rejected",  "却下"].includes(s);
+  const isCancelled = (s: string) => ["cancelled", "キャンセル"].includes(s);
 
   const statusLabel = (s: string) => {
-    if (isApproved(s))  return "笨・謇ｿ隱肴ｸ医∩";
-    if (isPending(s))   return "竢ｳ 譛ｪ謇ｿ隱・;
-    if (isRejected(s))  return "笶・蜊ｴ荳・;
-    if (isCancelled(s)) return "圻 蜿匁ｶ・;
+    if (isApproved(s))  return "✅ 承認済み";
+    if (isPending(s))   return "⏳ 未承認";
+    if (isRejected(s))  return "❌ 却下";
+    if (isCancelled(s)) return "🚫 取消";
     return s;
   };
 
@@ -120,10 +120,10 @@ export default function AdminPage() {
     return matchPrj && matchSts;
   });
 
-  // 笏笏 繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ荳ｭ・郁ｪ崎ｨｼ遒ｺ隱榊燕・俄楳笏笏笏笏笏笏笏笏笏笏笏笏笏
+  // 認証確認前
   if (checking) return null;
 
-  // 笏笏 繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  // ログイン画面
   if (!isAuth) return (
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
@@ -139,17 +139,17 @@ export default function AdminPage() {
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 900, color: "#1a2e4a", marginBottom: 6 }}>
-          CloudFan 邂｡逅・・
+          CloudFan 管理
         </h1>
         <p style={{ color: "#94a3b8", fontSize: 14, marginBottom: 32 }}>
-          白 邂｡逅・・ｰら畑繧ｨ繝ｪ繧｢縺ｧ縺・
+          🔒 管理者専用エリアです
         </p>
         <input
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") handleLogin(); }}
-          placeholder="繝代せ繝ｯ繝ｼ繝峨ｒ蜈･蜉・
+          placeholder="パスワードを入力"
           style={{
             width: "100%", padding: "14px 18px", border: "2px solid #e2e8f0",
             borderRadius: 10, fontSize: 16, boxSizing: "border-box",
@@ -169,19 +169,19 @@ export default function AdminPage() {
           fontWeight: 800, fontSize: 16, cursor: "pointer",
           boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
         }}>
-          箔 繝ｭ繧ｰ繧､繝ｳ
+          🔑 ログイン
         </button>
         <p style={{ marginTop: 20, fontSize: 12, color: "#cbd5e1" }}>
-          繝悶Λ繧ｦ繧ｶ繧帝哩縺倥ｋ縺ｨ閾ｪ蜍輔Ο繧ｰ繧｢繧ｦ繝医＠縺ｾ縺・
+          ブラウザを閉じると自動ログアウトします
         </p>
       </div>
     </div>
   );
 
-  // 笏笏 繝・・繧ｿ隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  // データ読み込み中
   if (loading) return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
-      <p>隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ...</p>
+      <p>読み込み中...</p>
     </div>
   );
 
@@ -189,30 +189,30 @@ export default function AdminPage() {
   const pendingList  = supporters.filter(s => isPending(s.status));
   const totalAmount  = approvedList.reduce((sum, s) => sum + (s.amount || 0), 0);
 
-  // 笏笏 邂｡逅・判髱｢譛ｬ菴・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  // 管理画面本体
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
-      {/* 繝倥ャ繝繝ｼ */}
+      {/* ヘッダー */}
       <div style={{ background: "linear-gradient(135deg,#1e3a5f,#2d6a4f)", color: "#fff", padding: "16px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>笘・邂｡逅・ム繝・す繝･繝懊・繝・/h1>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>🏠 管理ダッシュボード</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => router.push("/")} style={{ background: "rgba(255,255,255,0.2)", color: "#fff", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 14 }}>
-            竊・繧ｵ繧､繝医∈謌ｻ繧・
+            ← サイトへ戻る
           </button>
           <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 14 }}>
-            繝ｭ繧ｰ繧｢繧ｦ繝・
+            ログアウト
           </button>
         </div>
       </div>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px" }}>
-        {/* 繧ｵ繝槭Μ繝ｼ繧ｫ繝ｼ繝・*/}
+        {/* サマリーカード */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 32 }}>
           {[
-            { label: "邱乗髪謠ｴ驥鷹｡・,     value: `ﾂ･${totalAmount.toLocaleString()}`, color: "#1e3a5f" },
-            { label: "謇ｿ隱肴ｸ域髪謠ｴ閠・,   value: `${approvedList.length}蜷港,         color: "#2d6a4f" },
-            { label: "譛ｪ謇ｿ隱肴髪謠ｴ閠・,   value: `${pendingList.length}蜷港,          color: "#d97706" },
-            { label: "繝励Ο繧ｸ繧ｧ繧ｯ繝域焚", value: `${projects.length}莉ｶ`,             color: "#7c3aed" },
+            { label: "総支援金額",     value: `¥${totalAmount.toLocaleString()}`, color: "#1e3a5f" },
+            { label: "承認済み支援者", value: `${approvedList.length}人`,         color: "#2d6a4f" },
+            { label: "未承認支援者",   value: `${pendingList.length}人`,          color: "#d97706" },
+            { label: "プロジェクト数", value: `${projects.length}件`,             color: "#7c3aed" },
           ].map(c => (
             <div key={c.label} style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", borderLeft: `4px solid ${c.color}` }}>
               <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{c.label}</div>
@@ -221,43 +221,43 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* 繧ｿ繝・*/}
+        {/* タブ */}
         <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
           {(["supporters", "projects"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{ padding: "10px 24px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 14, background: tab === t ? "#1e3a5f" : "#e5e7eb", color: tab === t ? "#fff" : "#374151" }}>
-              {t === "supporters" ? "腸 謾ｯ謠ｴ閠・ｮ｡逅・ : "搭 繝励Ο繧ｸ繧ｧ繧ｯ繝育ｮ｡逅・}
+              {t === "supporters" ? "👥 支援者の管理" : "📋 プロジェクト管理"}
             </button>
           ))}
         </div>
 
-        {/* 謾ｯ謠ｴ閠・ち繝・*/}
+        {/* 支援者タブ */}
         {tab === "supporters" && (
           <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
               <select value={filterPrj} onChange={e => setFilterPrj(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13 }}>
-                <option value="all">縺吶∋縺ｦ縺ｮ繝励Ο繧ｸ繧ｧ繧ｯ繝・/option>
+                <option value="all">すべてのプロジェクト</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
               <select value={filterSts} onChange={e => setFilterSts(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13 }}>
-                <option value="all">縺吶∋縺ｦ縺ｮ繧ｹ繝・・繧ｿ繧ｹ</option>
-                <option value="pending">竢ｳ 譛ｪ謇ｿ隱・/option>
-                <option value="approved">笨・謇ｿ隱肴ｸ医∩</option>
-                <option value="rejected">笶・蜊ｴ荳・/option>
-                <option value="cancelled">圻 蜿匁ｶ・/option>
+                <option value="all">すべてのステータス</option>
+                <option value="pending">⏳ 未承認</option>
+                <option value="approved">✅ 承認済み</option>
+                <option value="rejected">❌ 却下</option>
+                <option value="cancelled">🚫 取消</option>
               </select>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f1f5f9" }}>
-                    {["譌･譎・, "蜷榊燕", "繝励Ο繧ｸ繧ｧ繧ｯ繝・, "繧ｳ繝ｼ繧ｹ", "驥鷹｡・, "繧ｹ繝・・繧ｿ繧ｹ", "謖ｯ霎ｼ繧ｳ繝ｼ繝・, "謫堺ｽ・].map(h => (
+                    {["日時", "名前", "プロジェクト", "コース", "金額", "ステータス", "振込コード", "操作"].map(h => (
                       <th key={h} style={{ padding: "10px 12px", textAlign: "left", color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>繝・・繧ｿ縺後≠繧翫∪縺帙ｓ</td></tr>
+                    <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>データがありません</td></tr>
                   ) : filtered.map(s => {
                     const prjName = projects.find(p => p.id === s.project_id)?.title ?? s.project_id;
                     return (
@@ -266,7 +266,7 @@ export default function AdminPage() {
                         <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.name}</td>
                         <td style={{ padding: "10px 12px" }}>{prjName}</td>
                         <td style={{ padding: "10px 12px" }}>{s.tier_name}</td>
-                        <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>ﾂ･{(s.amount || 0).toLocaleString()}</td>
+                        <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>¥{(s.amount || 0).toLocaleString()}</td>
                         <td style={{ padding: "10px 12px" }}>
                           <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 700, color: "#fff", background: statusColor(s.status) }}>
                             {statusLabel(s.status)}
@@ -275,9 +275,9 @@ export default function AdminPage() {
                         <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12 }}>{s.transfer_code ?? "-"}</td>
                         <td style={{ padding: "10px 12px" }}>
                           <div style={{ display: "flex", gap: 6 }}>
-                            {!isApproved(s.status)  && <button onClick={() => updateStatus(s.id, "approved")}  style={{ padding: "4px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>謇ｿ隱・/button>}
-                            {!isRejected(s.status)  && <button onClick={() => updateStatus(s.id, "rejected")}  style={{ padding: "4px 10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>蜊ｴ荳・/button>}
-                            {!isCancelled(s.status) && <button onClick={() => { if (confirm("蜿悶ｊ豸医＠縺ｾ縺吶°・・)) updateStatus(s.id, "cancelled"); }} style={{ padding: "4px 10px", background: "#6b7280", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>蜿匁ｶ・/button>}
+                            {!isApproved(s.status)  && <button onClick={() => updateStatus(s.id, "approved")}  style={{ padding: "4px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>承認</button>}
+                            {!isRejected(s.status)  && <button onClick={() => updateStatus(s.id, "rejected")}  style={{ padding: "4px 10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>却下</button>}
+                            {!isCancelled(s.status) && <button onClick={() => { if (confirm("取り消しますか？")) updateStatus(s.id, "cancelled"); }} style={{ padding: "4px 10px", background: "#6b7280", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>取消</button>}
                           </div>
                         </td>
                       </tr>
@@ -289,12 +289,12 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* 繝励Ο繧ｸ繧ｧ繧ｯ繝医ち繝・*/}
+        {/* プロジェクトタブ */}
         {tab === "projects" && (
           <div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
               <button onClick={() => router.push("/admin/project-edit")} style={{ padding: "10px 24px", background: "linear-gradient(135deg,#1e3a5f,#2d6a4f)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 14 }}>
-                ・・譁ｰ隕上・繝ｭ繧ｸ繧ｧ繧ｯ繝・
+                ＋ 新規プロジェクト
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
@@ -302,13 +302,13 @@ export default function AdminPage() {
                 <div key={p.id} style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                     <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e3a5f" }}>{p.title}</h3>
-                    <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700, color: "#fff", background: p.status === "蜍滄寔荳ｭ" ? "#2d6a4f" : "#6b7280" }}>
+                    <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700, color: "#fff", background: p.status === "募集中" ? "#2d6a4f" : "#6b7280" }}>
                       {p.status}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>逶ｮ讓・ ﾂ･{(p.goal_amount || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>目標: ¥{(p.goal_amount || 0).toLocaleString()}</div>
                   <button onClick={() => router.push(`/admin/project-edit?id=${p.id}`)} style={{ width: "100%", padding: "8px", background: "#f1f5f9", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                    笨擾ｸ・邱ｨ髮・
+                    ✏️ 編集
                   </button>
                 </div>
               ))}
