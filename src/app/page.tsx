@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -217,7 +217,10 @@ export default function TopPage() {
             {projects.map((p) => {
               const raised   = raisedAmounts[p.id]   ?? 0;
               const goal = Number((p as any)['目的'] ?? (p as any)['goal'] ?? p.goal_amount ?? 0) || 0;
-              const pct      = goal > 0 ? Math.min(100, Math.round(raised / goal * 100)) : 0;
+              const rawPct   = goal > 0 ? Math.round(raised / goal * 100) : 0;
+              const pct      = Math.min(3000, rawPct);
+              const barPct   = Math.min(100, rawPct);
+              const over100  = rawPct >= 100;
               const daysLeft = calcDaysLeft(p.deadline);
               const count    = supporterCounts[p.id] ?? 0;
               return (
@@ -268,12 +271,11 @@ export default function TopPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'baseline' }}>
                         <span style={{ fontSize: 22, fontWeight: 900, color: '#1a2e4a' }}>¥{fmt(raised)}</span>
                         <span style={{ fontSize: 14, fontWeight: 700,
-                          color: pct >= 100 ? '#059669' : '#2563eb' }}>{pct}%達成</span>
+                          color: over100 ? '#d97706' : '#2563eb' }}>{pct}%達成</span>
                       </div>
                       <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: pct + '%',
-                          background: pct >= 100
-                            ? 'linear-gradient(90deg,#059669,#34d399)'
+                        <div style={{ height: '100%', width: barPct + '%',
+                          background: over100 ? 'linear-gradient(90deg,#d97706,#fbbf24)'
                             : 'linear-gradient(90deg,#1a56db,#3b82f6)',
                           borderRadius: 4, transition: 'width 0.8s' }} />
                       </div>
@@ -404,3 +406,4 @@ export default function TopPage() {
     </div>
   );
 }
+
