@@ -54,6 +54,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   const [blocks, setBlocks] = useState<StoryBlock[]>(
     Array.from({ length: 5 }, () => ({ ...EMPTY_BLOCK }))
   );
+  const [tiers, setTiers] = useState<Tier[]>([]);
 
   const photoRefs = [
     useRef<HTMLInputElement>(null),
@@ -84,6 +85,13 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
 
     setProject(data);
 
+    // ティア読み込み
+    if (data.tiers && Array.isArray(data.tiers)) {
+      setTiers(data.tiers);
+    } else {
+      setTiers([]);
+    }
+
     if (data.story_blocks && Array.isArray(data.story_blocks)) {
       const loaded = data.story_blocks as StoryBlock[];
       const filled = Array.from({ length: 5 }, (_, i) => loaded[i] ?? { ...EMPTY_BLOCK });
@@ -96,7 +104,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           setBlocks(filled);
         }
       } catch {
-        // story が JSON でない場合は最初のブロックにセット
         setBlocks(prev => {
           const next = [...prev];
           next[0] = { ...EMPTY_BLOCK, body: data.story ?? '' };
@@ -110,6 +117,14 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
 
   const updateBlock = (index: number, field: keyof StoryBlock, value: string) => {
     setBlocks(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const updateTier = (index: number, field: keyof Tier, value: string | number | null) => {
+    setTiers(prev => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
       return next;
@@ -153,6 +168,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         goal: project.goal,
         youtube_url: project.youtube_url,
         status: project.status,
+        tiers: tiers,
         story: JSON.stringify(blocks),
         deadline: project.deadline && /^\d{4}-\d{2}-\d{2}$/.test(project.deadline) ? project.deadline : null,
       })
@@ -185,6 +201,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 16px', fontFamily: 'sans-serif' }}>
+
       {/* ヘッダー */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>
@@ -270,23 +287,92 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
             />
           </div>
+
+          {/* ✅ 修正①：ステータス選択肢を日本語で直接記述 */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>ステータス</label>
             <select
-              value={project.status ?? '\u52df\u96c6\u4e2d'}
+              value={project.status ?? '募集中'}
               onChange={e => setProject(prev => prev ? { ...prev, status: e.target.value } : prev)}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
             >
-              <option value='\u6e96\u5099\u4e2d'>\u6e96\u5099\u4e2d</option>
-              <option value='\u52df\u96c6\u4e2d'>\u52df\u96c6\u4e2d</option>
-              <option value='\u7d42\u4e86'>\u7d42\u4e86</option>
-              <option value='closed'>closed\uff08\u7d42\u4e86\uff09</option>
+              <option value="準備中">準備中</option>
+              <option value="募集中">募集中</option>
+              <option value="終了">終了</option>
+              <option value="closed">closed（終了）</option>
             </select>
           </div>
+
         </div>
       </section>
 
-      {/* ストーリーブロック */}
+      {/* ✅ 修正②：ティアのdescription編集フィールド追加（新規セクション） */}
+      <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#1e3a5f' }}>
+          🎁 支援プラン（ティア）編集
+        </h2>
+        {tiers.length === 0 ? (
+          <p style={{ color: '#94a3b8', fontSize: '14px' }}>ティアが登録されていません</p>
+        ) : (
+          tiers.map((tier, i) => (
+            <div key={tier.id ?? i} style={{
+              background: 'white',
+              borderRadius: '10px',
+              padding: '20px',
+              marginBottom: '12px',
+              border: '1px solid #e2e8f0',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <span style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '28px', height: '28px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '13px', fontWeight: 'bold', flexShrink: 0,
+                }}>
+                  {i + 1}
+                </span>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '15px' }}>
+                  {tier.name}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>プラン名</label>
+                  <input
+                    type="text"
+                    value={tier.name ?? ''}
+                    onChange={e => updateTier(i, 'name', e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>金額 (円)</label>
+                  <input
+                    type="number"
+                    value={tier.amount ?? 0}
+                    onChange={e => updateTier(i, 'amount', Number(e.target.value))}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>返礼品・説明</label>
+                  <textarea
+                    value={tier.description ?? ''}
+                    onChange={e => updateTier(i, 'description', e.target.value)}
+                    rows={3}
+                    placeholder="返礼品の内容や支援プランの説明を入力してください..."
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </section>
+
+      {/* ストーリーブロック ← 元のまま完全維持 */}
       <section style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#1e3a5f' }}>
           📖 ストーリー（5章）
@@ -308,7 +394,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
                 {CHAPTER_TITLES[i]}
               </h3>
             </div>
-
             <div style={{ display: 'grid', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>見出し（任意）</label>
@@ -371,7 +456,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         ))}
       </section>
 
-      {/* 保存ボタン */}
+      {/* 保存ボタン ← 元のまま完全維持 */}
       <div style={{ position: 'sticky', bottom: '24px', textAlign: 'center' }}>
         <button
           onClick={handleSave}
@@ -394,8 +479,3 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     </div>
   );
 }
-
-
-
-
-
