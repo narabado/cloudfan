@@ -322,29 +322,39 @@ export default function SupportPage() {
     setQty(1);
   };
 
+  // ━━ handleSubmit: /api/send-email 経由でDB保存＋メール送信 ━━
   async function handleSubmit() {
-    setSubmitting(true); setError('');
-    // 既存支援者数を取得して連番コードを生成
-    const { count: existingCount } = await supabase
-      .from('supporters')
-      .select('*', { count: 'exact', head: true })
-      .eq('project_id', id);
-    const nextNum = (existingCount ?? 0) + 1;
-    const code = String(nextNum).padStart(3, '0');
-    const { error: err } = await supabase.from('supporters').insert({
-      project_id: id, project_title: project?.title ?? '',
-      name: isAnon ? '匿名' : name, email,
-      tier: effectiveTier?.name ?? selTier?.name ?? '',
-      units: qty, total_amount: totalAmount,
-      transfer_code: code, status: 'pending',
-      message: message || null,
-    });
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supporterName: isAnon ? '匿名' : name,
+          supporterEmail: email,
+          tier: effectiveTier?.name ?? selTier?.name ?? '',
+          units: qty,
+          totalAmount,
+          message: message || '',
+          projectTitle: project?.title ?? '',
+          projectId: id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(`エラー: ${data.error ?? 'サーバーエラー'}`);
+        setSubmitting(false);
+        return;
+      }
+      setShowFireworks(true);
+      const dur = (getTierStyle(effectiveTier?.name ?? 'ブロンズ').fw.launches * 600) + 4000;
+      setTimeout(() => setShowFireworks(false), dur);
+      setStep('done');
+    } catch {
+      setError('通信エラーが発生しました');
+    }
     setSubmitting(false);
-    if (err) { setError(`エラー: ${err.message}`); return; }
-    setShowFireworks(true);
-    const dur = (getTierStyle(effectiveTier?.name ?? 'ブロンズ').fw.launches * 600) + 4000;
-    setTimeout(() => setShowFireworks(false), dur);
-    setStep('done');
   }
 
   if (loading) return (
