@@ -330,11 +330,11 @@ export default function ProjectDetail() {
                         borderRadius: 10, marginBottom: 20, fontSize: 16,
                         fontWeight: 800,
                       }}>{block.title || CHAPTER_TITLES[i] || `第${i + 1}章`}</h3>
-                      <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: '0 0 20px 0', whiteSpace: 'pre-wrap' }}>{block.body}</p>
                       {block.image_url && (
                         <img src={block.image_url} alt={`story-${i}`}
-                          style={{ width: '100%', aspectRatio: '16/7', objectFit: 'cover', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block' }} />
+                          style={{ width: '100%', aspectRatio: '16/7', objectFit: 'cover', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block', marginBottom: 20 }} />
                       )}
+                      <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap' }}>{block.body}</p>
                     </div>
                   ))}
                   {ytId && (
