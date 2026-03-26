@@ -1,3 +1,4 @@
+Set-Content -LiteralPath "C:\Users\user\Desktop\sports-support-hokkaido\src\app\admin\project-edit\ProjectEditForm.tsx" -Encoding UTF8 -Value @'
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -37,6 +38,16 @@ interface StoryBlock {
   image_url: string;
 }
 
+interface Supporter {
+  id: string;
+  name: string;
+  email: string;
+  amount: number;
+  tier_id: string | null;
+  tier_name: string | null;
+  created_at: string;
+}
+
 const CHAPTER_TITLES = [
   '🔥 なぜ今、支援が必要なのか',
   '🏆 私たちの挑戦と夢',
@@ -57,6 +68,8 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   );
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [heroUploading, setHeroUploading] = useState(false);
+  const [supporters, setSupporters] = useState<Supporter[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const heroPhotoRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +84,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
   useEffect(() => {
     if (!projectId) return;
     fetchProject();
+    fetchSupporters();
   }, [projectId]);
 
   const fetchProject = async () => {
@@ -118,6 +132,49 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setLoading(false);
   };
 
+  // ── 支援者取得 ──────────────────────────────────────────
+  const fetchSupporters = async () => {
+    const { data, error } = await supabase
+      .from('supporters')
+      .select('*')
+      .eq('project_id', Number(projectId))
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setSupporters(data as Supporter[]);
+    }
+  };
+
+  // ── 支援者削除 ──────────────────────────────────────────
+  const handleDeleteSupporter = async (supporterId: string) => {
+    if (!confirm('この支援者データを削除しますか？この操作は取り消せません。')) return;
+    setDeletingId(supporterId);
+    const { error } = await supabase
+      .from('supporters')
+      .delete()
+      .eq('id', supporterId);
+
+    setDeletingId(null);
+    if (error) {
+      setMessage(`削除失敗: ${error.message}`);
+    } else {
+      setSupporters(prev => prev.filter(s => s.id !== supporterId));
+      setMessage('✅ 支援者データを削除しました');
+    }
+  };
+
+  // ── ティアから金額を補完 ────────────────────────────────
+  const resolveAmount = (supporter: Supporter): number => {
+    if (supporter.amount && supporter.amount > 0) return supporter.amount;
+    // tier_id で一致するティアの金額を返す
+    const matchedByTierId = tiers.find(t => t.id === supporter.tier_id);
+    if (matchedByTierId) return matchedByTierId.amount;
+    // tier_name で一致するティアの金額を返す
+    const matchedByName = tiers.find(t => t.name === supporter.tier_name);
+    if (matchedByName) return matchedByName.amount;
+    return 0;
+  };
+
   const updateBlock = (index: number, field: keyof StoryBlock, value: string) => {
     setBlocks(prev => {
       const next = [...prev];
@@ -134,7 +191,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     });
   };
 
-  // ヒーロー画像アップロード
+  // ── ヒーロー画像アップロード ────────────────────────────
   const handleHeroImageUpload = async (file: File) => {
     setHeroUploading(true);
     const ext = file.name.split('.').pop();
@@ -159,7 +216,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     setHeroUploading(false);
   };
 
-  // ストーリーブロック画像アップロード
+  // ── ストーリーブロック画像アップロード ─────────────────
   const handleImageUpload = async (index: number, file: File) => {
     const ext = file.name.split('.').pop();
     const fileName = `story_block_${projectId}_${index}_${Date.now()}.${ext}`;
@@ -228,6 +285,8 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
       </div>
     );
   }
+
+  const totalAmount = supporters.reduce((sum, s) => sum + resolveAmount(s), 0);
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 16px', fontFamily: 'sans-serif' }}>
@@ -317,8 +376,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
             />
           </div>
-
-          {/* ステータス */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>ステータス</label>
             <select
@@ -332,11 +389,10 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
               <option value="closed">closed（終了）</option>
             </select>
           </div>
-
         </div>
       </section>
 
-      {/* ヒーロー画像（追加） */}
+      {/* ヒーロー画像 */}
       <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '2px solid #bfdbfe' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: '#1e3a5f' }}>
           🖼️ トップ画像（ヒーロー画像）
@@ -344,8 +400,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
           プロジェクト詳細ページの一番上に表示される横断幕のような画像です。
         </p>
-
-        {/* 現在の画像プレビュー */}
         {project.image_url ? (
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>現在の画像：</p>
@@ -359,16 +413,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
             <button
               type="button"
               onClick={() => setProject(prev => prev ? { ...prev, image_url: null } : prev)}
-              style={{
-                marginTop: '8px',
-                padding: '6px 14px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                color: '#ef4444',
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
+              style={{ marginTop: '8px', padding: '6px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', cursor: 'pointer' }}
             >
               🗑️ 画像を削除
             </button>
@@ -378,8 +423,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
             画像が設定されていません
           </div>
         )}
-
-        {/* アップロードボタン */}
         <input
           type="file"
           accept="image/*"
@@ -394,27 +437,12 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           type="button"
           onClick={() => heroPhotoRef.current?.click()}
           disabled={heroUploading}
-          style={{
-            width: '100%',
-            padding: '12px',
-            background: heroUploading ? '#e2e8f0' : 'white',
-            border: '2px dashed #60a5fa',
-            borderRadius: '8px',
-            cursor: heroUploading ? 'not-allowed' : 'pointer',
-            fontSize: '15px',
-            color: heroUploading ? '#94a3b8' : '#2563eb',
-            fontWeight: 'bold',
-            marginBottom: '12px',
-          }}
+          style={{ width: '100%', padding: '12px', background: heroUploading ? '#e2e8f0' : 'white', border: '2px dashed #60a5fa', borderRadius: '8px', cursor: heroUploading ? 'not-allowed' : 'pointer', fontSize: '15px', color: heroUploading ? '#94a3b8' : '#2563eb', fontWeight: 'bold', marginBottom: '12px' }}
         >
           {heroUploading ? '⏳ アップロード中...' : '📷 新しい画像をアップロード'}
         </button>
-
-        {/* URL直接入力 */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
-            または画像URLを直接入力
-          </label>
+          <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>または画像URLを直接入力</label>
           <input
             type="text"
             value={project.image_url ?? ''}
@@ -434,60 +462,121 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           <p style={{ color: '#94a3b8', fontSize: '14px' }}>ティアが登録されていません</p>
         ) : (
           tiers.map((tier, i) => (
-            <div key={tier.id ?? i} style={{
-              background: 'white',
-              borderRadius: '10px',
-              padding: '20px',
-              marginBottom: '12px',
-              border: '1px solid #e2e8f0',
-            }}>
+            <div key={tier.id ?? i} style={{ background: 'white', borderRadius: '10px', padding: '20px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <span style={{
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  color: 'white',
-                  borderRadius: '50%',
-                  width: '28px', height: '28px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '13px', fontWeight: 'bold', flexShrink: 0,
-                }}>
+                <span style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 'bold', flexShrink: 0 }}>
                   {i + 1}
                 </span>
-                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '15px' }}>
-                  {tier.name}
-                </span>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '15px' }}>{tier.name}</span>
               </div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>プラン名</label>
-                  <input
-                    type="text"
-                    value={tier.name ?? ''}
-                    onChange={e => updateTier(i, 'name', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
-                  />
+                  <input type="text" value={tier.name ?? ''} onChange={e => updateTier(i, 'name', e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>金額 (円)</label>
-                  <input
-                    type="number"
-                    value={tier.amount ?? 0}
-                    onChange={e => updateTier(i, 'amount', Number(e.target.value))}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
-                  />
+                  <input type="number" value={tier.amount ?? 0} onChange={e => updateTier(i, 'amount', Number(e.target.value))} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>返礼品・説明</label>
-                  <textarea
-                    value={tier.description ?? ''}
-                    onChange={e => updateTier(i, 'description', e.target.value)}
-                    rows={3}
-                    placeholder="返礼品の内容や支援プランの説明を入力してください..."
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }}
-                  />
+                  <textarea value={tier.description ?? ''} onChange={e => updateTier(i, 'description', e.target.value)} rows={3} placeholder="返礼品の内容や支援プランの説明を入力してください..." style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
                 </div>
               </div>
             </div>
           ))
+        )}
+      </section>
+
+      {/* ━━━━ 支援者一覧（新規追加） ━━━━ */}
+      <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '2px solid #d1fae5' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e3a5f', margin: 0 }}>
+            👥 支援者一覧
+          </h2>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '14px', color: '#64748b' }}>
+              {supporters.length}名
+            </span>
+            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#16a34a' }}>
+              合計 ¥{totalAmount.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        {supporters.length === 0 ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px', background: '#f1f5f9', borderRadius: '8px' }}>
+            まだ支援者がいません
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {supporters.map(supporter => {
+              const displayAmount = resolveAmount(supporter);
+              return (
+                <div
+                  key={supporter.id}
+                  style={{
+                    background: 'white',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                    border: '1px solid #e2e8f0',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    gap: '12px',
+                    alignItems: 'center',
+                  }}
+                >
+                  {/* 左側：支援者情報 */}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#0f172a' }}>
+                        {supporter.name || '（名前なし）'}
+                      </span>
+                      {supporter.tier_name && (
+                        <span style={{ fontSize: '12px', background: '#eff6ff', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', border: '1px solid #bfdbfe' }}>
+                          {supporter.tier_name}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#16a34a' }}>
+                        ¥{displayAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {supporter.email && (
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                          📧 {supporter.email}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        🕒 {new Date(supporter.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 右側：削除ボタン */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSupporter(supporter.id)}
+                    disabled={deletingId === supporter.id}
+                    style={{
+                      padding: '8px 14px',
+                      background: deletingId === supporter.id ? '#f1f5f9' : '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      color: deletingId === supporter.id ? '#94a3b8' : '#ef4444',
+                      fontSize: '13px',
+                      cursor: deletingId === supporter.id ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {deletingId === supporter.id ? '削除中...' : '🗑️ 削除'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         )}
       </section>
 
@@ -499,14 +588,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         {blocks.map((block, i) => (
           <div key={i} style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '16px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <span style={{
-                background: 'linear-gradient(135deg, #1e3a5f, #2563eb)',
-                color: 'white',
-                borderRadius: '50%',
-                width: '32px', height: '32px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '14px', fontWeight: 'bold', flexShrink: 0,
-              }}>
+              <span style={{ background: 'linear-gradient(135deg, #1e3a5f, #2563eb)', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', flexShrink: 0 }}>
                 {i + 1}
               </span>
               <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
@@ -516,57 +598,19 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
             <div style={{ display: 'grid', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>見出し（任意）</label>
-                <input
-                  type="text"
-                  value={block.title}
-                  onChange={e => updateBlock(i, 'title', e.target.value)}
-                  placeholder={CHAPTER_TITLES[i]}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
-                />
+                <input type="text" value={block.title} onChange={e => updateBlock(i, 'title', e.target.value)} placeholder={CHAPTER_TITLES[i]} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>本文</label>
-                <textarea
-                  value={block.body}
-                  onChange={e => updateBlock(i, 'body', e.target.value)}
-                  rows={5}
-                  placeholder="この章の内容を入力してください..."
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }}
-                />
+                <textarea value={block.body} onChange={e => updateBlock(i, 'body', e.target.value)} rows={5} placeholder="この章の内容を入力してください..." style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>画像</label>
                 {block.image_url && (
-                  <img
-                    src={block.image_url}
-                    alt={`ブロック${i + 1}`}
-                    style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '8px' }}
-                  />
+                  <img src={block.image_url} alt={`ブロック${i + 1}`} style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '8px' }} />
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={photoRefs[i]}
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(i, file);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => photoRefs[i].current?.click()}
-                  style={{
-                    padding: '8px 16px',
-                    background: 'white',
-                    border: '2px dashed #94a3b8',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: '#64748b',
-                    width: '100%',
-                  }}
-                >
+                <input type="file" accept="image/*" ref={photoRefs[i]} style={{ display: 'none' }} onChange={e => { const file = e.target.files?.[0]; if (file) handleImageUpload(i, file); }} />
+                <button type="button" onClick={() => photoRefs[i].current?.click()} style={{ padding: '8px 16px', background: 'white', border: '2px dashed #94a3b8', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', color: '#64748b', width: '100%' }}>
                   📷 画像をアップロード
                 </button>
               </div>
@@ -580,17 +624,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         <button
           onClick={handleSave}
           disabled={saving}
-          style={{
-            padding: '16px 48px',
-            background: saving ? '#94a3b8' : 'linear-gradient(135deg, #f59e0b, #d97706)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            boxShadow: saving ? 'none' : '0 4px 20px rgba(245,158,11,0.4)',
-          }}
+          style={{ padding: '16px 48px', background: saving ? '#94a3b8' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '18px', fontWeight: 'bold', cursor: saving ? 'not-allowed' : 'pointer', boxShadow: saving ? 'none' : '0 4px 20px rgba(245,158,11,0.4)' }}
         >
           {saving ? '保存中...' : '💾 保存する'}
         </button>
@@ -598,3 +632,4 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     </div>
   );
 }
+'@
