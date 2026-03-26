@@ -479,11 +479,22 @@ export default function ProjectDetail() {
                             : isTop10 ? tierBg
                             : '#e2e8f0',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: isTop3 ? 24 : isTop10 ? 22 : 15,
+                          flexDirection: 'column' as const,
+                          fontSize: isTop3 ? 16 : isTop10 ? 22 : 15,
                           fontWeight: 900,
                           color: (isTop3 || isTop10) ? '#fff' : '#64748b',
+                          boxShadow: isTop3
+                            ? idx === 0 ? '0 0 16px #fbbf24, 0 0 32px #f59e0b80'
+                            : idx === 1 ? '0 0 12px #94a3b8, 0 0 24px #64748b60'
+                            : '0 0 14px #fb923c, 0 0 28px #ea580c60'
+                            : isTop10 ? `0 0 10px ${tierBg}` : 'none',
                         }}>
-                          {isTop3 ? rankMedals[idx] : isTop10 ? tierIcon : `${idx + 1}`}
+                          {isTop3 ? (
+                            <>
+                              <span style={{ fontSize: 18, lineHeight: 1 }}>{rankMedals[idx]}</span>
+                              <span style={{ fontSize: 13, lineHeight: 1, marginTop: 1 }}>{tierIcon}</span>
+                            </>
+                          ) : isTop10 ? tierIcon : `${idx + 1}`}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
