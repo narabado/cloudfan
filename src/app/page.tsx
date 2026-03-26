@@ -11,7 +11,6 @@ interface Project {
   description: string;
   hero_image_url: string | null;
   画像: string | null;
-  画像: string | null;
   goal_amount: number;
   current_amount: number;
   deadline: string | null;
