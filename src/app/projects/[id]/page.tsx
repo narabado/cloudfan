@@ -134,24 +134,20 @@ export default function ProjectDetail() {
       setProject(proj as unknown as Project);
 
       // tiers は crowdfunding_projects.tiers JSONB から直接取得
-      if (Array.isArray((proj as unknown as Project).tiers) && ((proj as unknown as Project).tiers as Tier[]).length > 0) {
-        setTiers(((proj as unknown as Project).tiers as Tier[]).map((t: Tier, i: number) => ({
-          ...t,
-          id: t.id ?? String(i),
-        })));
+      const rawTiers = (proj as any)['tiers'];
+      if (Array.isArray(rawTiers) && rawTiers.length > 0) {
+        setTiers(rawTiers.map((t: Tier, i: number) => ({ ...t, id: t.id ?? String(i) })));
       }
-
       const { data: supRows } = await supabase
         .from('supporters')
         .select('*')
         .eq('project_id', Number(id))
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false });
 
       if (supRows) {
         const rows = supRows as unknown as Supporter[];
-        setSupporters(rows);
-        const total = rows.reduce(
+        const approvedRows = (rows ?? []).filter((s: any) => s['status'] === 'approved');
+        setSupporters(approvedRows);
+        const total = approvedRows.reduce(
           (sum, r) => sum + (Number(r['total_amount']) || 0), 0
         );
         setTotalRaised(total);
@@ -179,7 +175,7 @@ export default function ProjectDetail() {
   const days        = calcDaysLeft(project.deadline);
   const statusBadge = getStatusBadge(project.status);
   const ended       = isEnded(project.status);
-  const goalAmount  = Number(project.goal_amount) || 0;
+  const goalAmount = Number((project as any)['goal'] ?? 0) || 0;
   const progressPct = goalAmount > 0
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;

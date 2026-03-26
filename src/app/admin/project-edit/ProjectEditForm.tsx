@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
@@ -273,14 +273,14 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>ステータス</label>
             <select
-              value={project.status ?? 'active'}
+              value={project.status ?? '\u52df\u96c6\u4e2d'}
               onChange={e => setProject(prev => prev ? { ...prev, status: e.target.value } : prev)}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' }}
             >
-              <option value="active">active（募集中）</option>
-              <option value="募集中">募集中</option>
-              <option value="closed">closed（終了）</option>
-              <option value="終了">終了</option>
+              <option value='\u6e96\u5099\u4e2d'>\u6e96\u5099\u4e2d</option>
+              <option value='\u52df\u96c6\u4e2d'>\u52df\u96c6\u4e2d</option>
+              <option value='\u7d42\u4e86'>\u7d42\u4e86</option>
+              <option value='closed'>closed\uff08\u7d42\u4e86\uff09</option>
             </select>
           </div>
         </div>
