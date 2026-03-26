@@ -170,6 +170,7 @@ export default function ProjectDetail() {
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;
 
+  console.log("SUPPORTERS DATA:", JSON.stringify(supporters));
   const tierCount: Record<string, number> = {};
   for (const s of supporters) {
     const key = String(s['tier_name'] || '');
