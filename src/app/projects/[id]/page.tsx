@@ -194,9 +194,11 @@ export default function ProjectDetail() {
   const statusBadge = getStatusBadge(project.status);
   const ended       = isEnded(project.status);
   const goalAmount  = Number((project as any)['goal'] ?? 0) || 0;
-  const progressPct = goalAmount > 0
-    ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
-    : 0;
+
+  const rawPct      = goalAmount > 0 ? Math.round((totalRaised / goalAmount) * 100) : 0;
+  const progressPct = Math.min(3000, rawPct);
+  const barPct      = Math.min(100, rawPct);
+  const isOver100   = rawPct >= 100;
 
   const topTiers   = tiers.slice(0, Math.min(5, tiers.length));
   const tierColors = ['#2563eb', '#059669', '#d97706', '#9333ea', '#dc2626'];
@@ -472,10 +474,6 @@ export default function ProjectDetail() {
                       0%,100% { filter: drop-shadow(0 0 6px currentColor) brightness(1); }
                       50% { filter: drop-shadow(0 0 18px currentColor) drop-shadow(0 0 32px currentColor) brightness(1.3); }
                     }
-                    @keyframes medalSpin {
-                      0% { transform: rotateY(0deg); }
-                      100% { transform: rotateY(360deg); }
-                    }
                     @keyframes rankPulse1 {
                       0%,100% { box-shadow: 0 0 12px #fbbf24, 0 0 24px #f59e0b60; }
                       50% { box-shadow: 0 0 28px #fbbf24, 0 0 56px #f59e0b, 0 0 80px #fbbf2460; }
@@ -582,11 +580,27 @@ export default function ProjectDetail() {
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                   <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>達成率</span>
-                  <span style={{ fontSize: 32, fontWeight: 900, color: '#1a2e4a' }}>{progressPct}%</span>
+                  <span style={{
+                    fontSize: 32, fontWeight: 900,
+                    color: isOver100 ? '#d97706' : '#1a2e4a',
+                  }}>{progressPct}%{isOver100 && ' 🎉'}</span>
                 </div>
                 <div style={{ height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${progressPct}%`, background: 'linear-gradient(90deg, #2563eb, #059669)', borderRadius: 5, transition: 'width 1s ease' }} />
+                  <div style={{
+                    height: '100%',
+                    width: `${barPct}%`,
+                    background: isOver100
+                      ? 'linear-gradient(90deg, #d97706, #f59e0b, #fbbf24)'
+                      : 'linear-gradient(90deg, #2563eb, #059669)',
+                    borderRadius: 5,
+                    transition: 'width 1s ease',
+                  }} />
                 </div>
+                {isOver100 && (
+                  <p style={{ fontSize: 11, color: '#d97706', fontWeight: 700, marginTop: 4, textAlign: 'right' }}>
+                    目標達成！引き続き支援を受付中
+                  </p>
+                )}
               </div>
               <div style={{ fontSize: 30, fontWeight: 900, color: '#1a2e4a', marginBottom: 4 }}>¥{totalRaised.toLocaleString()}</div>
               <div style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>目標: ¥{goalAmount.toLocaleString()}</div>
