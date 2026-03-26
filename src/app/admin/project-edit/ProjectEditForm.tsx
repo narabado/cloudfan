@@ -24,6 +24,7 @@ interface Project {
   goal: number;
   deadline: string | null;
   images: string[];
+  image_url: string | null;
   youtube_url: string | null;
   tiers: Tier[] | null;
   status: string;
@@ -55,6 +56,9 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     Array.from({ length: 5 }, () => ({ ...EMPTY_BLOCK }))
   );
   const [tiers, setTiers] = useState<Tier[]>([]);
+  const [heroUploading, setHeroUploading] = useState(false);
+
+  const heroPhotoRef = useRef<HTMLInputElement>(null);
 
   const photoRefs = [
     useRef<HTMLInputElement>(null),
@@ -85,7 +89,6 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
 
     setProject(data);
 
-    // ティア読み込み
     if (data.tiers && Array.isArray(data.tiers)) {
       setTiers(data.tiers);
     } else {
@@ -131,6 +134,32 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
     });
   };
 
+  // ヒーロー画像アップロード
+  const handleHeroImageUpload = async (file: File) => {
+    setHeroUploading(true);
+    const ext = file.name.split('.').pop();
+    const fileName = `hero_${projectId}_${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('project-images')
+      .upload(fileName, file, { upsert: true });
+
+    if (uploadError) {
+      setMessage(`ヒーロー画像アップロード失敗: ${uploadError.message}`);
+      setHeroUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('project-images')
+      .getPublicUrl(fileName);
+
+    setProject(prev => prev ? { ...prev, image_url: urlData.publicUrl } : prev);
+    setMessage('ヒーロー画像をアップロードしました ✅');
+    setHeroUploading(false);
+  };
+
+  // ストーリーブロック画像アップロード
   const handleImageUpload = async (index: number, file: File) => {
     const ext = file.name.split('.').pop();
     const fileName = `story_block_${projectId}_${index}_${Date.now()}.${ext}`;
@@ -170,6 +199,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         status: project.status,
         tiers: tiers,
         story: JSON.stringify(blocks),
+        image_url: project.image_url ?? null,
         deadline: project.deadline && /^\d{4}-\d{2}-\d{2}$/.test(project.deadline) ? project.deadline : null,
       })
       .eq('id', Number(projectId));
@@ -288,7 +318,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
             />
           </div>
 
-          {/* ✅ 修正①：ステータス選択肢を日本語で直接記述 */}
+          {/* ステータス */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>ステータス</label>
             <select
@@ -306,7 +336,96 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         </div>
       </section>
 
-      {/* ✅ 修正②：ティアのdescription編集フィールド追加（新規セクション） */}
+      {/* ヒーロー画像（追加） */}
+      <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '2px solid #bfdbfe' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: '#1e3a5f' }}>
+          🖼️ トップ画像（ヒーロー画像）
+        </h2>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+          プロジェクト詳細ページの一番上に表示される横断幕のような画像です。
+        </p>
+
+        {/* 現在の画像プレビュー */}
+        {project.image_url ? (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>現在の画像：</p>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '16/5', overflow: 'hidden', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <img
+                src={project.image_url}
+                alt="ヒーロー画像"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setProject(prev => prev ? { ...prev, image_url: null } : prev)}
+              style={{
+                marginTop: '8px',
+                padding: '6px 14px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                color: '#ef4444',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              🗑️ 画像を削除
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginBottom: '16px', padding: '20px', background: '#f1f5f9', borderRadius: '8px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
+            画像が設定されていません
+          </div>
+        )}
+
+        {/* アップロードボタン */}
+        <input
+          type="file"
+          accept="image/*"
+          ref={heroPhotoRef}
+          style={{ display: 'none' }}
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) handleHeroImageUpload(file);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => heroPhotoRef.current?.click()}
+          disabled={heroUploading}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: heroUploading ? '#e2e8f0' : 'white',
+            border: '2px dashed #60a5fa',
+            borderRadius: '8px',
+            cursor: heroUploading ? 'not-allowed' : 'pointer',
+            fontSize: '15px',
+            color: heroUploading ? '#94a3b8' : '#2563eb',
+            fontWeight: 'bold',
+            marginBottom: '12px',
+          }}
+        >
+          {heroUploading ? '⏳ アップロード中...' : '📷 新しい画像をアップロード'}
+        </button>
+
+        {/* URL直接入力 */}
+        <div>
+          <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
+            または画像URLを直接入力
+          </label>
+          <input
+            type="text"
+            value={project.image_url ?? ''}
+            onChange={e => setProject(prev => prev ? { ...prev, image_url: e.target.value || null } : prev)}
+            placeholder="https://..."
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', color: '#334155' }}
+          />
+        </div>
+      </section>
+
+      {/* ティア編集 */}
       <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#1e3a5f' }}>
           🎁 支援プラン（ティア）編集
@@ -372,7 +491,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         )}
       </section>
 
-      {/* ストーリーブロック ← 元のまま完全維持 */}
+      {/* ストーリーブロック */}
       <section style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#1e3a5f' }}>
           📖 ストーリー（5章）
@@ -456,7 +575,7 @@ export default function ProjectEditForm({ projectId }: { projectId: number }) {
         ))}
       </section>
 
-      {/* 保存ボタン ← 元のまま完全維持 */}
+      {/* 保存ボタン */}
       <div style={{ position: 'sticky', bottom: '24px', textAlign: 'center' }}>
         <button
           onClick={handleSave}
