@@ -32,6 +32,7 @@ export default function TopPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [supporterCounts, setSupporterCounts] = useState<Record<number, number>>({});
+  const [raisedAmounts,   setRaisedAmounts]   = useState<Record<number, number>>({});
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
@@ -40,25 +41,32 @@ export default function TopPage() {
       const { data: pData } = await supabase
         .from('crowdfunding_projects')
         .select('*')
-        .in('status', ['approved', 'active'])
+        .in('status', ['approved', 'active', '募集中', '承認'])
         .order('created_at', { ascending: false });
       setProjects(pData ?? []);
 
       const { data: sData } = await supabase
         .from('supporters')
-        .select('project_id, status');
-      const counts: Record<number, number> = {};
-      (sData ?? []).forEach((s: { project_id: number; status: string }) => {
-        const approved = ['approved', 'pending', 'active'].includes(s.status);
-        if (approved) counts[s.project_id] = (counts[s.project_id] ?? 0) + 1;
+        .select('project_id, status, total_amount');
+
+      const counts:  Record<number, number> = {};
+      const amounts: Record<number, number> = {};
+      (sData ?? []).forEach((s: { project_id: number; status: string; total_amount: any }) => {
+        const st = String(s.status ?? '');
+        const isApproved = ['approved', '承認', 'active'].includes(st);
+        if (isApproved) {
+          counts[s.project_id]  = (counts[s.project_id]  ?? 0) + 1;
+          amounts[s.project_id] = (amounts[s.project_id] ?? 0) + (Number(s.total_amount) || 0);
+        }
       });
       setSupporterCounts(counts);
+      setRaisedAmounts(amounts);
     };
     load();
     return () => clearTimeout(timer);
   }, []);
 
-  const totalAmount = projects.reduce((s, p) => s + (Number(p.current_amount) || 0), 0);
+  const totalAmount     = Object.values(raisedAmounts).reduce((s, v) => s + v, 0);
   const totalSupporters = Object.values(supporterCounts).reduce((s, v) => s + v, 0);
   const minDays = projects.length > 0
     ? Math.min(...projects.map((p) => calcDaysLeft(p.deadline)))
@@ -139,7 +147,7 @@ export default function TopPage() {
           </h1>
           <p style={{ fontSize: 'clamp(14px, 2vw, 17px)', opacity: 0.85,
             lineHeight: 1.9, marginBottom: 40, maxWidth: 500, margin: '0 auto 40px' }}>
-            遠征費・用具購入・大会参加費など<br />
+            遠征費・用具費・大会参加費などの<br />
             北海道のバドミントン部・クラブチームの<br />
             活動をクラウドファンディングで支援できます
           </p>
@@ -152,7 +160,7 @@ export default function TopPage() {
                 fontWeight: 800, cursor: 'pointer',
                 boxShadow: '0 4px 20px rgba(212,175,55,0.4)',
               }}>
-              🏆 プロジェクトを見る →
+              🏸 プロジェクトを見る →
             </button>
             <button
               onClick={() => document.getElementById('how-to')?.scrollIntoView({ behavior: 'smooth' })}
@@ -172,9 +180,9 @@ export default function TopPage() {
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, textAlign: 'center' }}>
           {[
-            { label: '累積支援額',         value: '¥' + fmt(totalAmount),               icon: '💰' },
-            { label: '支援者数',           value: fmt(totalSupporters) + '名',            icon: '👥' },
-            { label: '募集中プロジェクト', value: projects.length + '件',                 icon: '🏆' },
+            { label: '総支援金額',         value: '¥' + fmt(totalAmount),               icon: '💰' },
+            { label: '支援者数',           value: fmt(totalSupporters) + '人',            icon: '👥' },
+            { label: '募集中プロジェクト', value: projects.length + '件',                 icon: '🏸' },
             { label: '最短残り日数',       value: minDays !== null ? minDays + '日' : '—', icon: '⏰' },
           ].map((s) => (
             <div key={s.label} style={{ padding: '8px 0' }}>
@@ -191,10 +199,10 @@ export default function TopPage() {
       <div id="projects" style={{ padding: '64px 24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#1a2e4a', marginBottom: 8 }}>
-            🏆 募集中のプロジェクト
+            🏸 募集中のプロジェクト
           </h2>
           <p style={{ color: '#6b7280', fontSize: 15 }}>
-            北海道のバドミントン部・クラブチームへの支援を今すぐ始めよう
+            北海道のバドミントン部・クラブチームへの支援を集めています
           </p>
         </div>
 
@@ -207,11 +215,11 @@ export default function TopPage() {
           <div style={{ display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 28 }}>
             {projects.map((p) => {
-              const pct = (Number(p.goal_amount) || 0) > 0
-                ? Math.min(100, Math.round((Number(p.current_amount) || 0) / (Number(p.goal_amount) || 1) * 100))
-                : 0;
+              const raised   = raisedAmounts[p.id]   ?? 0;
+              const goal     = Number(p.goal_amount)  || 0;
+              const pct      = goal > 0 ? Math.min(100, Math.round(raised / goal * 100)) : 0;
               const daysLeft = calcDaysLeft(p.deadline);
-              const count = supporterCounts[p.id] ?? 0;
+              const count    = supporterCounts[p.id] ?? 0;
               return (
                 <div key={p.id}
                   style={{ background: '#fff', borderRadius: 18, overflow: 'hidden',
@@ -227,7 +235,7 @@ export default function TopPage() {
                   }}>
                   <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: '#e2e8f0' }}>
                     {p.image_url ? (
-                      <img src={p.image_url || ''} alt={p.title}
+                      <img src={p.image_url} alt={p.title}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%',
@@ -258,7 +266,7 @@ export default function TopPage() {
                   <div style={{ padding: '18px 20px 20px' }}>
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 22, fontWeight: 900, color: '#1a2e4a' }}>¥{fmt(p.current_amount)}</span>
+                        <span style={{ fontSize: 22, fontWeight: 900, color: '#1a2e4a' }}>¥{fmt(raised)}</span>
                         <span style={{ fontSize: 14, fontWeight: 700,
                           color: pct >= 100 ? '#059669' : '#2563eb' }}>{pct}%達成</span>
                       </div>
@@ -270,7 +278,7 @@ export default function TopPage() {
                           borderRadius: 4, transition: 'width 0.8s' }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-                        <span style={{ fontSize: 12, color: '#6b7280' }}>目標: ¥{fmt(p.goal_amount)}</span>
+                        <span style={{ fontSize: 12, color: '#6b7280' }}>目標: ¥{fmt(goal)}</span>
                         <span style={{ fontSize: 12, color: '#6b7280' }}>👥 {fmt(count)}名が支援</span>
                       </div>
                     </div>
@@ -294,7 +302,7 @@ export default function TopPage() {
                         style={{ padding: '11px 8px', border: 'none', borderRadius: 10,
                           background: 'linear-gradient(135deg,#1a2e4a,#2563eb)',
                           color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                        💎 今すぐ支援
+                        ⭐ 今すぐ支援
                       </button>
                     </div>
                   </div>
@@ -312,15 +320,15 @@ export default function TopPage() {
               🏸 こんな活動を支援できます
             </h2>
             <p style={{ color: '#6b7280', fontSize: 14 }}>
-              北海道のバドミントン部・クラブチームが抱える悩みをみんなで解決
+              北海道のバドミントン部・クラブチームが抱えるお悩みをみんなで解決
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 20 }}>
             {[
               { icon: '✈️', title: '遠征費・交通費',      desc: '道外・全国大会への遠征費用を支援' },
               { icon: '🏸', title: '用具・ユニフォーム', desc: 'ラケット・シューズ・ウェアの購入支援' },
-              { icon: '🏟️', title: '大会参加費',          desc: '全道・全国大会への出場費用を支援' },
-              { icon: '💪', title: '施設・練習環境',      desc: '体育館・施設設備の整備を支援' },
+              { icon: '🏆', title: '大会参加費',          desc: '全道・全国大会への出場費用を支援' },
+              { icon: '🏟️', title: '施設・練習環境',      desc: '練習場・施設使用料の費用を支援' },
             ].map((f) => (
               <div key={f.title} style={{ background: '#fff', borderRadius: 14,
                 padding: '24px 20px', textAlign: 'center',
@@ -342,9 +350,9 @@ export default function TopPage() {
             gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 24 }}>
             {[
               { step: '01', icon: '🔍', title: 'プロジェクトを探す', desc: '支援したいチームを見つけましょう' },
-              { step: '02', icon: '💰', title: '支援プランを選ぶ',   desc: '¥1,000〜好きな金額のプランを選択' },
+              { step: '02', icon: '💎', title: '支援プランを選ぶ',   desc: '¥1,000〜好きな金額のプランを選択' },
               { step: '03', icon: '📝', title: 'フォームに入力',      desc: 'お名前とメールアドレスを入力' },
-              { step: '04', icon: '🎉', title: '支払いで支援完了',    desc: '支払いコードをメールで受け取り支払い' },
+              { step: '04', icon: '💳', title: 'お支払いで支援完了',    desc: '支払いコードをメールで受け取り支払い' },
             ].map((s) => (
               <div key={s.step} style={{ background: '#fff', borderRadius: 14,
                 padding: 24, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -382,7 +390,7 @@ export default function TopPage() {
             <button onClick={() => router.push('/admin')}
               style={{ background: 'none', border: 'none',
                 color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 13 }}>
-              管理者ログイン
+              管理ログイン
             </button>
           </div>
         </div>
