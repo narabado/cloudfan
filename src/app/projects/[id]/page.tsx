@@ -31,16 +31,10 @@ interface Project {
   story: string | null;
   goal_amount: number;
   deadline: string | null;
-  hero_image_url: string | null;
+  image_url: string | null;
   youtube_url: string | null;
   tiers: Tier[] | null;
   status: string;
-}
-
-interface TierComment {
-  tierId: string;
-  name: string;
-  comment: string;
 }
 
 const CHAPTER_TITLES = [
@@ -114,8 +108,6 @@ export default function ProjectDetail() {
   const [error,        setError]        = useState('');
   const [activeTab,    setActiveTab]    = useState<'story' | 'tiers' | 'supporters' | 'ranking'>('story');
   const [copied,       setCopied]       = useState(false);
-  const [tierComments, setTierComments] = useState<TierComment[]>([]);
-  const [newComment,   setNewComment]   = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -194,8 +186,6 @@ export default function ProjectDetail() {
   );
   const rankMedals = ['🥇', '🥈', '🥉'];
 
-  const addComment = (tierId: string) => {
-    const text = (newComment[tierId] || '').trim();
     if (!text) return;
     setTierComments(prev => [{ tierId, name: '匿名', comment: text }, ...prev]);
     setNewComment(prev => ({ ...prev, [tierId]: '' }));
@@ -252,9 +242,9 @@ export default function ProjectDetail() {
           </div>
         </nav>
 
-        {project.hero_image_url && (
+        {project.image_url && (
           <div style={{ width: '100%', height: 360, overflow: 'hidden', position: 'relative' }}>
-            <img src={project.hero_image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={project.image_url} alt="hero" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%)' }} />
             <div style={{
               position: 'absolute', top: 16, right: 16, padding: '6px 16px',
@@ -270,7 +260,7 @@ export default function ProjectDetail() {
               {([project.school, project.club, project.region] as string[]).filter(Boolean).map((t, i) => (
                 <span key={i} style={{ background: '#e8f4fd', color: '#1a56db', padding: '4px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{t}</span>
               ))}
-              {!project.hero_image_url && (
+              {!project.image_url && (
                 <span style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
               )}
             </div>
@@ -377,8 +367,7 @@ export default function ProjectDetail() {
                     const c = tierColors[i] || '#1a56db';
                     const sCount = tierCount[tier.name] || 0;
                     const tierId = String(tier.id ?? i);
-                    const comments = tierComments.filter(t => t.tierId === tierId);
-                    return (
+                                    return (
                       <div key={tierId} style={{ marginBottom: 28, border: `2px solid ${c}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
                         <div style={{ background: c, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
