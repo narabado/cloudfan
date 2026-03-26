@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,8 +12,8 @@ type Supporter = {
   project_id: string;
   name: string;
   email: string;
-  amount: number;
-  tier_name: string;
+  total_amount: number;
+  tier: string;
   status: string;
   message: string | null;
   transfer_code: string | null;
@@ -23,7 +23,7 @@ type Supporter = {
 type Tier = {
   id: string;
   name: string;
-  amount: number;
+  total_amount: number;
 };
 
 type Project = {
@@ -104,10 +104,10 @@ export default function AdminPage() {
 
   // ── 金額補完：amount=0 の場合ティアから取得 ─────────
   const resolveAmount = (s: Supporter): number => {
-    if (s.amount && s.amount > 0) return s.amount;
+    if (s.total_amount && s.total_amount > 0) return s.total_amount;
     const prj = projects.find(p => p.id === s.project_id);
     if (prj?.tiers) {
-      const tier = prj.tiers.find(t => t.name === s.tier_name);
+      const tier = prj.tiers.find(t => t.name === s.tier);
       if (tier) return tier.amount;
     }
     return 0;
@@ -290,7 +290,7 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.name}</td>
                         <td style={{ padding: "10px 12px" }}>{prjName}</td>
-                        <td style={{ padding: "10px 12px" }}>{s.tier_name}</td>
+                        <td style={{ padding: "10px 12px" }}>{s.tier}</td>
                         {/* ← 金額を補完後の値で表示 */}
                         <td style={{ padding: "10px 12px", fontWeight: 700, color: "#1e3a5f" }}>
                           ¥{displayAmount.toLocaleString()}
@@ -371,3 +371,6 @@ export default function AdminPage() {
     </div>
   );
 }
+
+
+
