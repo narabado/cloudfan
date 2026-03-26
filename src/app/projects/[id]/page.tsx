@@ -441,6 +441,28 @@ export default function ProjectDetail() {
 
               {activeTab === 'ranking' && (
                 <div>
+                  <style>{`
+                    @keyframes medalGlow {
+                      0%,100% { filter: drop-shadow(0 0 6px currentColor) brightness(1); }
+                      50% { filter: drop-shadow(0 0 18px currentColor) drop-shadow(0 0 32px currentColor) brightness(1.3); }
+                    }
+                    @keyframes medalSpin {
+                      0% { transform: rotateY(0deg); }
+                      100% { transform: rotateY(360deg); }
+                    }
+                    @keyframes rankPulse1 {
+                      0%,100% { box-shadow: 0 0 12px #fbbf24, 0 0 24px #f59e0b60; }
+                      50% { box-shadow: 0 0 28px #fbbf24, 0 0 56px #f59e0b, 0 0 80px #fbbf2460; }
+                    }
+                    @keyframes rankPulse2 {
+                      0%,100% { box-shadow: 0 0 10px #94a3b8, 0 0 20px #64748b60; }
+                      50% { box-shadow: 0 0 24px #94a3b8, 0 0 48px #64748b, 0 0 64px #94a3b860; }
+                    }
+                    @keyframes rankPulse3 {
+                      0%,100% { box-shadow: 0 0 10px #fb923c, 0 0 20px #ea580c60; }
+                      50% { box-shadow: 0 0 24px #fb923c, 0 0 48px #ea580c, 0 0 64px #fb923c60; }
+                    }
+                  `}</style>
                   <div style={{ marginBottom: 24, padding: '14px 18px', background: 'linear-gradient(135deg, #fef9c3, #fef3c7)', borderRadius: 10, border: '1px solid #fde68a', textAlign: 'center' }}>
                     <p style={{ margin: 0, color: '#92400e', fontSize: 15, fontWeight: 800 }}>🏆 支援者ランキング（支援金額順）</p>
                   </div>
@@ -471,11 +493,11 @@ export default function ProjectDetail() {
                           : '1px solid #e2e8f0',
                       }}>
                         <div style={{
-                          width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+                          width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
                           background: isTop3
-                            ? idx === 0 ? 'linear-gradient(135deg, #f59e0b, #fbbf24)'
-                            : idx === 1 ? 'linear-gradient(135deg, #64748b, #94a3b8)'
-                            : 'linear-gradient(135deg, #ea580c, #fb923c)'
+                            ? idx === 0 ? 'linear-gradient(135deg, #f59e0b, #fbbf24, #ffe066)'
+                            : idx === 1 ? 'linear-gradient(135deg, #64748b, #94a3b8, #d0d8e0)'
+                            : 'linear-gradient(135deg, #ea580c, #fb923c, #ffd0a0)'
                             : isTop10 ? tierBg
                             : '#e2e8f0',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -483,17 +505,24 @@ export default function ProjectDetail() {
                           fontSize: isTop3 ? 16 : isTop10 ? 22 : 15,
                           fontWeight: 900,
                           color: (isTop3 || isTop10) ? '#fff' : '#64748b',
-                          boxShadow: isTop3
-                            ? idx === 0 ? '0 0 16px #fbbf24, 0 0 32px #f59e0b80'
-                            : idx === 1 ? '0 0 12px #94a3b8, 0 0 24px #64748b60'
-                            : '0 0 14px #fb923c, 0 0 28px #ea580c60'
-                            : isTop10 ? `0 0 10px ${tierBg}` : 'none',
+                          animation: isTop3
+                            ? idx === 0 ? 'rankPulse1 2s ease-in-out infinite'
+                            : idx === 1 ? 'rankPulse2 2s ease-in-out infinite'
+                            : 'rankPulse3 2s ease-in-out infinite'
+                            : 'none',
                         }}>
                           {isTop3 ? (
-                            <>
-                              <span style={{ fontSize: 18, lineHeight: 1 }}>{rankMedals[idx]}</span>
-                              <span style={{ fontSize: 13, lineHeight: 1, marginTop: 1 }}>{tierIcon}</span>
-                            </>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                              <span style={{
+                                fontSize: 22, lineHeight: 1,
+                                animation: 'medalGlow 1.5s ease-in-out infinite',
+                                color: idx === 0 ? '#fbbf24' : idx === 1 ? '#e2e8f0' : '#fb923c',
+                              }}>{rankMedals[idx]}</span>
+                              <span style={{
+                                fontSize: 12, lineHeight: 1,
+                                animation: `medalGlow 1.8s ease-in-out infinite ${idx * 0.3}s`,
+                              }}>{tierIcon}</span>
+                            </div>
                           ) : isTop10 ? tierIcon : `${idx + 1}`}
                         </div>
                         <div style={{ flex: 1 }}>
