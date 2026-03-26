@@ -1,635 +1,500 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-interface Tier {
-  id: string;
-  name: string;
-  amount: number;
-  description: string;
-  limit: number | null;
-  remaining: number | null;
-}
-
-interface Project {
-  id: number;
-  title: string;
-  school: string;
-  club: string;
-  region: string;
-  deadline: string | null;
-}
-
+/* ── 型定義 ── */
+interface Tier { id: string; name: string; amount: number; description: string; limit?: number; remaining?: number; }
+interface Project { id: string; title: string; school: string; club: string; region: string; deadline: string; }
 type Step = 'form' | 'confirm' | 'done';
 
-// ── ティア別プレミアムスタイル定義 ──────────────────────────────
+/* ── ティアスタイル定義 ── */
 const TIER_STYLES = [
   {
-    // ブロンズ
-    border:   '2px solid #cd7f32',
-    bg:       'linear-gradient(135deg, #fdf3e7 0%, #f5deb3 100%)',
-    selectedBg: 'linear-gradient(135deg, #f0c080 0%, #cd7f32 100%)',
-    badge:    '#cd7f32',
-    badgeBg:  '#fdf3e7',
-    icon:     '🥉',
-    glow:     '0 0 16px rgba(205,127,50,0.4)',
+    name: 'ブロンズ', icon: '🥉', glow: '#CD7F32',
+    grad: 'linear-gradient(135deg,#3d1f00,#8B4513,#CD7F32)',
+    selGrad: 'linear-gradient(135deg,#5a2e00,#A0522D,#D4935A)',
+    pageBg: 'linear-gradient(135deg,#1a0f00 0%,#3d2000 40%,#6b3a00 70%,#1a0f00 100%)',
+    starCount: 0,
+    fw: { colors: ['#CD7F32','#FFA55E','#FFE0CC'], count: 30, launches: 1 }
   },
   {
-    // シルバー
-    border:   '2px solid #9e9ea0',
-    bg:       'linear-gradient(135deg, #f4f4f5 0%, #d4d4d8 100%)',
-    selectedBg: 'linear-gradient(135deg, #e2e2e4 0%, #9e9ea0 100%)',
-    badge:    '#71717a',
-    badgeBg:  '#f4f4f5',
-    icon:     '🥈',
-    glow:     '0 0 16px rgba(158,158,160,0.4)',
+    name: 'シルバー', icon: '🥈', glow: '#C0C0C0',
+    grad: 'linear-gradient(135deg,#2a2a2a,#888888,#C0C0C0)',
+    selGrad: 'linear-gradient(135deg,#333,#999,#E0E0E0)',
+    pageBg: 'linear-gradient(135deg,#0d0d0d 0%,#2a2a2a 40%,#4a4a4a 70%,#0d0d0d 100%)',
+    starCount: 5,
+    fw: { colors: ['#C0C0C0','#E8E8E8','#FFFFFF','#A8A8A8'], count: 50, launches: 3 }
   },
   {
-    // ゴールド
-    border:   '2px solid #f59e0b',
-    bg:       'linear-gradient(135deg, #fffbeb 0%, #fde68a 100%)',
-    selectedBg: 'linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%)',
-    badge:    '#d97706',
-    badgeBg:  '#fffbeb',
-    icon:     '🥇',
-    glow:     '0 0 20px rgba(245,158,11,0.5)',
+    name: 'ゴールド', icon: '🏆', glow: '#FFD700',
+    grad: 'linear-gradient(135deg,#5a3a00,#B8860B,#FFD700)',
+    selGrad: 'linear-gradient(135deg,#6b4400,#DAA520,#FFEC8B)',
+    pageBg: 'linear-gradient(135deg,#1a1000 0%,#3d2800 30%,#6b4800 60%,#3d2800 80%,#1a1000 100%)',
+    starCount: 10,
+    fw: { colors: ['#FFD700','#FFA500','#FFEC8B','#FF8C00','#FFFACD'], count: 80, launches: 6 }
   },
   {
-    // プラチナ
-    border:   '2px solid #6366f1',
-    bg:       'linear-gradient(135deg, #eef2ff 0%, #c7d2fe 100%)',
-    selectedBg: 'linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%)',
-    badge:    '#4f46e5',
-    badgeBg:  '#eef2ff',
-    icon:     '💎',
-    glow:     '0 0 24px rgba(99,102,241,0.5)',
+    name: 'プラチナ', icon: '💎', glow: '#87CEEB',
+    grad: 'linear-gradient(135deg,#1a2a3a,#4a7a9b,#87CEEB)',
+    selGrad: 'linear-gradient(135deg,#1e3448,#5a8aab,#ADD8E6)',
+    pageBg: 'linear-gradient(135deg,#000d1a 0%,#001a33 30%,#003366 60%,#001a33 80%,#000d1a 100%)',
+    starCount: 18,
+    fw: { colors: ['#E5E4E2','#BCC6CC','#FFFFFF','#ADD8E6','#87CEEB','#B0E0E6'], count: 130, launches: 10 }
   },
   {
-    // レジェンド
-    border:   '2px solid transparent',
-    bg:       'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
-    selectedBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-    badge:    '#f093fb',
-    badgeBg:  '#1a1a2e',
-    icon:     '👑',
-    glow:     '0 0 32px rgba(240,147,251,0.6), 0 0 64px rgba(102,126,234,0.3)',
+    name: 'レジェンド', icon: '👑', glow: '#9B59B6',
+    grad: 'linear-gradient(135deg,#1a0030,#6B0080,#9B59B6,#FFD700)',
+    selGrad: 'linear-gradient(135deg,#200040,#7B0090,#AB69C6,#FFD700)',
+    pageBg: 'linear-gradient(135deg,#0d0020 0%,#1a0040 20%,#2d006b 40%,#1a0060 60%,#0d0030 80%,#0d0020 100%)',
+    starCount: 35,
+    fw: { colors: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#00BFFF','#8B00FF','#FFD700','#FF69B4','#00FFFF'], count: 220, launches: 20 }
   },
 ];
 
-function getTierStyle(idx: number) {
-  return TIER_STYLES[Math.min(idx, TIER_STYLES.length - 1)];
+/* ── パーティクル設定 ── */
+const PARTICLE_CFG: Record<string, { chars: string[]; count: number }> = {
+  'シルバー': { chars: ['✦','✧','⭐','·'], count: 5 },
+  'ゴールド': { chars: ['✦','⭐','🌟','✨','💫'], count: 10 },
+  'プラチナ': { chars: ['💎','✦','⭐','🌟','✨','❄️'], count: 18 },
+  'レジェンド': { chars: ['👑','🌟','✨','💫','⭐','🔥','💥','🎇','🎆'], count: 35 },
+};
+
+function getTierStyle(name: string) { return TIER_STYLES.find(t => t.name === name) || TIER_STYLES[0]; }
+
+/* ── 背景パーティクル ── */
+function BackgroundParticles({ tierName }: { tierName: string }) {
+  const cfg = PARTICLE_CFG[tierName];
+  const particles = useMemo(() => {
+    if (!cfg) return [];
+    return Array.from({ length: cfg.count }, (_, i) => ({
+      id: i,
+      char: cfg.chars[i % cfg.chars.length],
+      left: Math.random() * 100,
+      delay: Math.random() * 8,
+      duration: 6 + Math.random() * 8,
+      size: 16 + Math.random() * 20,
+    }));
+  }, [tierName]);
+
+  if (!cfg) return null;
+  const isLegend = tierName === 'レジェンド';
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1, overflow: 'hidden' }}>
+      <style>{`
+        @keyframes floatUp {
+          0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+        }
+        @keyframes aurora {
+          0%,100% { opacity: 0.3; transform: scaleX(1) scaleY(1); }
+          50% { opacity: 0.6; transform: scaleX(1.1) scaleY(1.2); }
+        }
+      `}</style>
+      {isLegend && (
+        <>
+          <div style={{ position: 'absolute', top: '10%', left: '-20%', width: '80%', height: '40%', background: 'radial-gradient(ellipse,rgba(155,89,182,0.3),transparent 70%)', animation: 'aurora 4s ease-in-out infinite', borderRadius: '50%' }} />
+          <div style={{ position: 'absolute', top: '30%', right: '-20%', width: '70%', height: '35%', background: 'radial-gradient(ellipse,rgba(255,215,0,0.2),transparent 70%)', animation: 'aurora 5s ease-in-out infinite 1s', borderRadius: '50%' }} />
+          <div style={{ position: 'absolute', bottom: '10%', left: '10%', width: '60%', height: '30%', background: 'radial-gradient(ellipse,rgba(255,0,128,0.2),transparent 70%)', animation: 'aurora 6s ease-in-out infinite 2s', borderRadius: '50%' }} />
+        </>
+      )}
+      {particles.map(p => (
+        <div key={p.id} style={{ position: 'absolute', bottom: 0, left: `${p.left}%`, fontSize: p.size, animation: `floatUp ${p.duration}s ${p.delay}s infinite linear`, willChange: 'transform,opacity' }}>
+          {p.char}
+        </div>
+      ))}
+    </div>
+  );
 }
 
+/* ── ランクアップオーバーレイ ── */
+function RankUpOverlay({ fromTier, toTier, onDone }: { fromTier: string; toTier: string; onDone: () => void }) {
+  const style = getTierStyle(toTier);
+  const tierIdx = TIER_STYLES.findIndex(t => t.name === toTier);
+  const intensity = tierIdx + 1;
+  const starCount = [0, 5, 12, 20, 35][tierIdx] ?? 35;
+
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000 + intensity * 400);
+    return () => clearTimeout(t);
+  }, [onDone, intensity]);
+
+  const stars = useMemo(() =>
+    Array.from({ length: starCount }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 10 + Math.random() * 20,
+      delay: Math.random() * 1.5,
+    })), [starCount]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+      <style>{`
+        @keyframes rankFlash { 0%{opacity:0.9} 30%{opacity:0.4} 100%{opacity:0} }
+        @keyframes rankCard { 0%{transform:scale(0.3) translateY(-60px);opacity:0} 40%{transform:scale(1.15) translateY(0);opacity:1} 70%{transform:scale(0.95)} 100%{transform:scale(1)} }
+        @keyframes rankStar { 0%{transform:scale(0) rotate(0deg);opacity:0} 50%{transform:scale(1.5) rotate(180deg);opacity:1} 100%{transform:scale(1) rotate(360deg);opacity:0} }
+        @keyframes rankPulse { 0%,100%{box-shadow:0 0 30px ${style.glow}} 50%{box-shadow:0 0 80px ${style.glow},0 0 120px ${style.glow}} }
+      `}</style>
+      <div style={{ position: 'absolute', inset: 0, background: style.glow, animation: 'rankFlash 1.2s ease-out forwards' }} />
+      {stars.map(s => (
+        <div key={s.id} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, fontSize: s.size, animation: `rankStar 2s ${s.delay}s ease-out forwards` }}>
+          {style.icon}
+        </div>
+      ))}
+      <div style={{ position: 'relative', background: style.grad, border: `3px solid ${style.glow}`, borderRadius: 24, padding: '40px 56px', textAlign: 'center', animation: 'rankCard 0.8s cubic-bezier(0.34,1.56,0.64,1) forwards, rankPulse 1s 0.8s ease-in-out 3', boxShadow: `0 0 60px ${style.glow}` }}>
+        <div style={{ fontSize: 72, lineHeight: 1, marginBottom: 8 }}>{style.icon}</div>
+        <div style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 600, letterSpacing: 4, opacity: 0.8, marginBottom: 4 }}>FROM {fromTier}</div>
+        <div style={{ color: style.glow, fontSize: 36, fontWeight: 900, letterSpacing: 6, textShadow: `0 0 20px ${style.glow}` }}>RANK UP!</div>
+        <div style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 700, marginTop: 8 }}>{toTier} 達成！</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 花火キャンバス ── */
+interface Particle { x: number; y: number; vx: number; vy: number; alpha: number; color: string; size: number; decay: number; }
+
+function FireworksCanvas({ tierName, active, zIndex = 9999 }: { tierName: string; active: boolean; zIndex?: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const particlesRef = useRef<Particle[]>([]);
+  const animFrameRef = useRef<number>(0);
+  const launchCountRef = useRef(0);
+  const style = getTierStyle(tierName);
+  const fw = style.fw;
+
+  const launchFirework = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const x = canvas.width * (0.2 + Math.random() * 0.6);
+    const y = canvas.height * (0.1 + Math.random() * 0.5);
+    for (let i = 0; i < fw.count; i++) {
+      const angle = (Math.PI * 2 * i) / fw.count + Math.random() * 0.3;
+      const speed = 2 + Math.random() * 5;
+      particlesRef.current.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1,
+        color: fw.colors[Math.floor(Math.random() * fw.colors.length)],
+        size: 2 + Math.random() * 3,
+        decay: 0.01 + Math.random() * 0.008,
+      });
+    }
+  }, [fw]);
+
+  useEffect(() => {
+    if (!active) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    launchCountRef.current = 0;
+    particlesRef.current = [];
+    launchFirework();
+    launchCountRef.current = 1;
+
+    const launchInterval = setInterval(() => {
+      if (launchCountRef.current >= fw.launches) { clearInterval(launchInterval); return; }
+      launchFirework();
+      launchCountRef.current++;
+    }, 600);
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      particlesRef.current = particlesRef.current.filter(p => p.alpha > 0.02);
+      for (const p of particlesRef.current) {
+        ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        p.x += p.vx; p.y += p.vy; p.vy += 0.06; p.vx *= 0.98; p.alpha -= p.decay; p.size *= 0.99;
+      }
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => { clearInterval(launchInterval); cancelAnimationFrame(animFrameRef.current); };
+  }, [active, launchFirework, fw.launches]);
+
+  if (!active) return null;
+  return <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex }} />;
+}
+
+/* ── メインコンポーネント ── */
 export default function SupportPage() {
   const { id } = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [project,    setProject]    = useState<Project | null>(null);
-  const [tiers,      setTiers]      = useState<Tier[]>([]);
-  const [selTier,    setSelTier]    = useState<Tier | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [step,       setStep]       = useState<Step>('form');
+  const [project, setProject] = useState<Project | null>(null);
+  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [selTier, setSelTier] = useState<Tier | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState<Step>('form');
   const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState('');
-
-  const [name,    setName]    = useState('');
-  const [email,   setEmail]   = useState('');
-  const [qty,     setQty]     = useState(1);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [qty, setQty] = useState(1);
   const [message, setMessage] = useState('');
-  const [isAnon,  setIsAnon]  = useState(false);
+  const [isAnon, setIsAnon] = useState(false);
+  const [error, setError] = useState('');
+  const [showFireworks, setShowFireworks] = useState(false);
+  const [rankUp, setRankUp] = useState<{ from: string; to: string } | null>(null);
+  const prevEffTierRef = useRef<string>('');
+  const [bgTierName, setBgTierName] = useState<string>('ブロンズ');
 
-  // ── 合計金額・自動ティア昇格（描画ごとに再計算）──────────────────
-  const totalAmount = selTier ? selTier.amount * qty : 0;
-  const effectiveTier: Tier | null = selTier && tiers.length > 0
-    ? ([...tiers]
-        .filter(t => totalAmount >= t.amount)
-        .sort((a, b) => b.amount - a.amount)[0] ?? selTier)
-    : selTier;
-  const effectiveIdx = effectiveTier ? tiers.findIndex(t => t.id === effectiveTier.id) : 0;
-  const effectiveStyle = getTierStyle(effectiveIdx);
-  const upgraded = effectiveTier && selTier && effectiveTier.name !== selTier.name;
-
+  /* データ取得 */
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data: proj } = await supabase
+      const { data, error: err } = await supabase
         .from('crowdfunding_projects')
-        .select('*')
+        .select('id,title,school,club,region,deadline,tiers')
         .eq('id', id)
         .single();
-
-      if (!proj) { setLoading(false); return; }
-
-      setProject({
-        id:       proj.id,
-        title:    proj.title    ?? '',
-        school:   proj.school   ?? '',
-        club:     proj.club     ?? '',
-        region:   proj.region   ?? '',
-        deadline: proj.deadline ?? null,
-      });
-
-      const raw = (proj as any)['tiers'] ?? [];
-      const list: Tier[] = Array.isArray(raw)
-        ? raw.map((t: any, i: number) => ({
-            ...t,
-            id: t.id != null ? String(t.id) : String(i),
-          }))
-        : [];
-      setTiers(list);
-
+      if (err || !data) { setLoading(false); return; }
+      setProject({ id: data.id, title: data.title ?? '', school: data.school ?? '', club: data.club ?? '', region: data.region ?? '', deadline: data.deadline ?? '' });
+      let parsed: Tier[] = [];
+      try { const raw = typeof data.tiers === 'string' ? JSON.parse(data.tiers) : data.tiers; if (Array.isArray(raw)) parsed = raw; } catch { parsed = []; }
+      setTiers(parsed);
       const tierParam = searchParams.get('tier');
-      if (tierParam && list.length > 0) {
-        const found = list.find((t) => String(t.id) === tierParam);
-        if (found) { setSelTier(found); }
-        else {
-          const idx = parseInt(tierParam, 10);
-          setSelTier(!isNaN(idx) && list[idx] ? list[idx] : list[0]);
-        }
-      } else if (list.length > 0) {
-        setSelTier(list[0]);
-      }
-
+      const idx = tierParam !== null ? parseInt(tierParam) : 0;
+      const initial = parsed[idx] ?? parsed[0];
+      if (initial) { setSelTier(initial); setBgTierName(initial.name); }
       setLoading(false);
     })();
   }, [id, searchParams]);
 
-  async function handleSubmit() {
-    if (!selTier || !project || !effectiveTier) return;
-    setSubmitting(true);
-    setError('');
+  const totalAmount = (selTier?.amount ?? 0) * qty;
+  const effectiveTier = [...tiers].filter(t => totalAmount >= t.amount).sort((a, b) => b.amount - a.amount)[0] ?? selTier;
+  const upgraded = effectiveTier && selTier && effectiveTier.name !== selTier.name;
+  const effStyle = getTierStyle(effectiveTier?.name ?? 'ブロンズ');
+  const selStyle = getTierStyle(bgTierName);
 
-    const transferCode = 'SP-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-
-    const { error: insertErr } = await supabase
-      .from('supporters')
-      .insert([{
-        project_id:    Number(id),
-        project_title: project.title,
-        name:          isAnon ? '匿名' : name,
-        email:         email,
-        tier:          effectiveTier.name,
-        units:         qty,
-        total_amount:  totalAmount,
-        transfer_code: transferCode,
-        status:        'pending',
-        message:       message,
-      }]);
-
-    if (insertErr) {
-      setError('送信に失敗しました: ' + insertErr.message);
-      setSubmitting(false);
-      return;
+  /* ランクアップ検知 → 背景・オーバーレイ同時変更 */
+  useEffect(() => {
+    const currentName = effectiveTier?.name ?? '';
+    if (!currentName) return;
+    if (prevEffTierRef.current && prevEffTierRef.current !== currentName) {
+      const prevIdx = TIER_STYLES.findIndex(t => t.name === prevEffTierRef.current);
+      const newIdx = TIER_STYLES.findIndex(t => t.name === currentName);
+      if (newIdx > prevIdx) {
+        setBgTierName(currentName);          // ← 背景を即変更
+        setRankUp({ from: prevEffTierRef.current, to: currentName }); // ← オーバーレイ表示
+      }
     }
+    prevEffTierRef.current = currentName;
+  }, [effectiveTier?.name]);
 
-    setStep('done');
+  /* ティア選択時も背景変更 */
+  const handleTierSelect = (tier: Tier) => {
+    setSelTier(tier);
+    setBgTierName(tier.name);
+    setQty(1);
+  };
+
+  async function handleSubmit() {
+    setSubmitting(true); setError('');
+    const code = 'SP-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const { error: err } = await supabase.from('supporters').insert({
+      project_id: id, project_title: project?.title ?? '',
+      name: isAnon ? '匿名' : name, email,
+      tier: effectiveTier?.name ?? selTier?.name ?? '',
+      units: qty, total_amount: totalAmount,
+      transfer_code: code, status: 'pending',
+      message: message || null,
+    });
     setSubmitting(false);
+    if (err) { setError(`エラー: ${err.message}`); return; }
+    setShowFireworks(true);
+    const dur = (getTierStyle(effectiveTier?.name ?? 'ブロンズ').fw.launches * 600) + 4000;
+    setTimeout(() => setShowFireworks(false), dur);
+    setStep('done');
   }
 
-  // ── ローディング画面 ─────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 24,
-      }}>
-        <div style={{ fontSize: 72, animation: 'bounce 0.8s infinite alternate' }}>🏸</div>
-        <div style={{
-          fontFamily: '"Noto Sans JP", sans-serif',
-          fontWeight: 900,
-          fontSize: 32,
-          letterSpacing: '0.15em',
-          background: 'linear-gradient(90deg, #f093fb, #f5a623, #38ef7d)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}>ならバド</div>
-        <p style={{ color: '#94a3b8', fontSize: 14, letterSpacing: '0.1em' }}>読み込み中...</p>
-        <style>{`@keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-20px); } }`}</style>
+  /* ローディング */
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)' }}>
+      <div style={{ background: 'white', borderRadius: 20, padding: 40, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+        <img src="/narabado-logo.png" alt="ならバド" style={{ width: 100, height: 100, objectFit: 'contain', borderRadius: '50%' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        <div style={{ fontSize: 14, color: '#4A90E2', fontWeight: 600, letterSpacing: 2 }}>読み込み中...</div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ── 完了画面 ────────────────────────────────────────────────────
-  if (step === 'done') {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 24,
-        padding: 32,
-      }}>
-        <div style={{ fontSize: 80 }}>🎉</div>
-        <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 900, textAlign: 'center', margin: 0 }}>
-          ご支援ありがとうございます！
-        </h1>
-        <p style={{ color: '#94a3b8', textAlign: 'center', lineHeight: 1.8, margin: 0 }}>
-          {project?.club ?? ''} への支援が完了しました。<br />
-          振込情報はメールにてお送りします。
-        </p>
-        <button
-          onClick={() => router.push(`/projects/${id}`)}
-          style={{
-            padding: '14px 36px',
-            background: 'linear-gradient(135deg, #667eea, #764ba2)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 14,
-            fontSize: 16,
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 4px 24px rgba(102,126,234,0.4)',
-          }}
-        >
-          プロジェクトページへ戻る
-        </button>
-      </div>
-    );
-  }
-
-  // ── 確認画面 ────────────────────────────────────────────────────
-  if (step === 'confirm') {
-    const isLegend = effectiveIdx >= 4;
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: isLegend
-          ? 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)'
-          : 'linear-gradient(135deg, #f0f4ff, #faf7ff)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-      }}>
-        <div style={{
-          background: isLegend ? 'rgba(255,255,255,0.05)' : '#fff',
-          borderRadius: 24,
-          boxShadow: effectiveStyle.glow + ', 0 8px 40px rgba(0,0,0,0.12)',
-          padding: '40px 32px',
-          maxWidth: 480,
-          width: '100%',
-          border: effectiveStyle.border,
-        }}>
-          {/* ヘッダー */}
-          <div style={{
-            background: effectiveStyle.selectedBg,
-            borderRadius: 16,
-            padding: '20px 24px',
-            marginBottom: 28,
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>{effectiveStyle.icon}</div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: isLegend ? '#fff' : '#1e293b' }}>
-              支援内容の確認
-            </h1>
-            {upgraded && (
-              <div style={{
-                marginTop: 10,
-                background: 'rgba(255,255,255,0.2)',
-                borderRadius: 999,
-                padding: '4px 16px',
-                fontSize: 12,
-                fontWeight: 700,
-                color: isLegend ? '#f0f0ff' : '#1e1e3f',
-                display: 'inline-block',
-              }}>
-                🎉 {selTier?.name} → {effectiveTier?.name} に自動昇格！
-              </div>
-            )}
+  /* 完了画面 */
+  if (step === 'done') return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100 }} />
+      <FireworksCanvas tierName={effectiveTier?.name ?? 'ブロンズ'} active={showFireworks} zIndex={101} />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 102, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(24px)', border: `2px solid ${effStyle.glow}`, borderRadius: 24, padding: '48px 36px', textAlign: 'center', maxWidth: 480, width: '100%', boxShadow: `0 20px 80px rgba(0,0,0,0.6), 0 0 40px ${effStyle.glow}40` }}>
+          <div style={{ fontSize: 72, marginBottom: 16 }}>{effStyle.icon}</div>
+          <h1 style={{ color: effStyle.glow, fontSize: 28, fontWeight: 800, marginBottom: 8 }}>ありがとうございます！</h1>
+          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 15, marginBottom: 4 }}>{project?.title ?? ''} への支援が完了しました</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20 }}>{project?.school} {project?.club}</p>
+          <div style={{ margin: '24px 0', background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 16 }}>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 4 }}>支援ティア</div>
+            <div style={{ color: effStyle.glow, fontSize: 22, fontWeight: 700 }}>{effStyle.icon} {effectiveTier?.name}</div>
+            <div style={{ color: '#FFD700', fontSize: 32, fontWeight: 800, marginTop: 8 }}>¥{totalAmount.toLocaleString()}</div>
           </div>
-
-          {/* 内容テーブル */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginBottom: 24 }}>
-            <tbody>
-              {[
-                ['プロジェクト', project?.club],
-                ['お名前',      isAnon ? '匿名' : name],
-                ['メール',      email],
-                ['ティア',      effectiveTier?.name + ' ' + effectiveStyle.icon],
-                ['口数',        qty + ' 口'],
-                ['合計金額',    '¥' + totalAmount.toLocaleString()],
-              ].map(([label, val], i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                  <td style={{ padding: '10px 0', color: isLegend ? '#94a3b8' : '#64748b', width: '40%' }}>{label}</td>
-                  <td style={{
-                    padding: '10px 0',
-                    fontWeight: label === '合計金額' ? 800 : 600,
-                    fontSize: label === '合計金額' ? 20 : 14,
-                    color: label === '合計金額'
-                      ? (isLegend ? '#f093fb' : '#6366f1')
-                      : (isLegend ? '#e2e8f0' : '#1e293b'),
-                  }}>{val}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</p>}
-
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              onClick={() => setStep('form')}
-              style={{
-                flex: 1,
-                padding: '14px 0',
-                background: 'transparent',
-                border: '2px solid rgba(100,116,139,0.3)',
-                borderRadius: 14,
-                fontSize: 15,
-                fontWeight: 600,
-                color: isLegend ? '#94a3b8' : '#475569',
-                cursor: 'pointer',
-              }}
-            >戻る</button>
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              style={{
-                flex: 2,
-                padding: '14px 0',
-                background: submitting ? '#94a3b8' : effectiveStyle.selectedBg,
-                border: 'none',
-                borderRadius: 14,
-                fontSize: 15,
-                fontWeight: 700,
-                color: '#fff',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                boxShadow: submitting ? 'none' : effectiveStyle.glow,
-              }}
-            >{submitting ? '送信中...' : '支援を確定する'}</button>
-          </div>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, marginBottom: 28 }}>振込コードをメールでご確認ください</p>
+          <button onClick={() => router.push(`/projects/${id}`)} style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: 12, padding: '14px 36px', fontSize: 15, fontWeight: 700, cursor: 'pointer', width: '100%', boxShadow: '0 4px 20px rgba(102,126,234,0.4)' }}>
+            プロジェクトページへ戻る
+          </button>
         </div>
       </div>
-    );
-  }
+    </>
+  );
 
-  // ── フォーム画面 ────────────────────────────────────────────────
-  const selIdx = selTier ? tiers.findIndex(t => t.id === selTier.id) : 0;
-
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(160deg, #f0f4ff 0%, #faf7ff 50%, #f0fdf4 100%)',
-      paddingBottom: 60,
-    }}>
-      {/* ── ナビバー ── */}
-      <div style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        background: 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(0,0,0,0.06)',
-        padding: '12px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-      }}>
-        <button
-          onClick={() => router.back()}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '2px solid #e2e8f0',
-            borderRadius: 10,
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#475569',
-            cursor: 'pointer',
-          }}
-        >← 戻る</button>
-        <span style={{ fontWeight: 800, fontSize: 17, color: '#1e293b' }}>
-          🏸 支援する
-        </span>
-      </div>
-
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '28px 16px' }}>
-        {/* プロジェクト名 */}
-        {project && (
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <h1 style={{ fontSize: 26, fontWeight: 900, color: '#1e293b', margin: '0 0 6px' }}>
-              {project.club}
-            </h1>
-            <p style={{ color: '#64748b', margin: 0 }}>{project.school}</p>
+  /* 確認画面 */
+  if (step === 'confirm') return (
+    <div style={{ minHeight: '100vh', background: effStyle.pageBg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, transition: 'background 0.8s ease' }}>
+      <div style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(20px)', border: `2px solid ${effStyle.glow}`, borderRadius: 24, padding: '40px 32px', maxWidth: 480, width: '100%', boxShadow: `0 0 40px ${effStyle.glow}30` }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: 48 }}>{effStyle.icon}</div>
+          <h2 style={{ color: 'white', fontSize: 22, fontWeight: 800, marginTop: 8 }}>支援内容の確認</h2>
+        </div>
+        {[
+          ['プロジェクト', project?.title ?? ''],
+          ['支援者名', isAnon ? '匿名' : name],
+          ['メールアドレス', email],
+          ['ティア', `${effStyle.icon} ${effectiveTier?.name}`],
+          ['口数', `${qty}口`],
+          ['合計金額', `¥${totalAmount.toLocaleString()}`],
+        ].map(([label, val]) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{label}</span>
+            <span style={{ color: 'white', fontWeight: 600, fontSize: 14 }}>{val}</span>
+          </div>
+        ))}
+        {upgraded && (
+          <div style={{ margin: '16px 0', background: `${effStyle.glow}20`, border: `1px solid ${effStyle.glow}`, borderRadius: 10, padding: '10px 14px', textAlign: 'center', color: effStyle.glow, fontSize: 13, fontWeight: 600 }}>
+            ✨ ティアが {selTier?.name} → {effectiveTier?.name} にアップグレードされました！
           </div>
         )}
-
-        {/* ── ティア選択 ── */}
-        {tiers.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#374151', marginBottom: 14 }}>
-              💎 支援ティアを選ぶ
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {tiers.map((t, idx) => {
-                const s = getTierStyle(idx);
-                const isSel = selTier?.id === t.id;
-                const isLeg = idx >= 4;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => { setSelTier(t); setQty(1); }}
-                    style={{
-                      textAlign: 'left',
-                      border: isSel ? '2.5px solid transparent' : s.border,
-                      borderRadius: 18,
-                      padding: '18px 20px',
-                      background: isSel ? s.selectedBg : s.bg,
-                      boxShadow: isSel ? s.glow + ', 0 4px 20px rgba(0,0,0,0.08)' : '0 2px 8px rgba(0,0,0,0.05)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      transform: isSel ? 'scale(1.02)' : 'scale(1)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 22 }}>{s.icon}</span>
-                        <span style={{
-                          fontWeight: 800,
-                          fontSize: 16,
-                          color: isSel && isLeg ? '#fff' : (isSel ? '#1e1e3f' : (isLeg ? '#e2e8f0' : '#1e293b')),
-                        }}>{t.name}</span>
-                      </div>
-                      <span style={{
-                        fontWeight: 900,
-                        fontSize: 18,
-                        color: isSel && isLeg ? '#f093fb' : (isSel ? '#fff' : s.badge),
-                        background: isSel ? 'rgba(255,255,255,0.2)' : s.badgeBg,
-                        padding: '4px 12px',
-                        borderRadius: 999,
-                      }}>¥{Number(t.amount).toLocaleString()}</span>
-                    </div>
-                    {t.description && (
-                      <p style={{
-                        margin: '8px 0 0 32px',
-                        fontSize: 13,
-                        color: isSel && isLeg ? 'rgba(255,255,255,0.7)' : (isSel ? 'rgba(30,30,63,0.7)' : '#64748b'),
-                      }}>{t.description}</p>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── 支援者情報 ── */}
-        <div style={{
-          background: '#fff',
-          borderRadius: 20,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
-          padding: '28px 24px',
-          marginBottom: 16,
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 800, color: '#374151', marginBottom: 20, margin: '0 0 20px' }}>
-            👤 支援者情報
-          </h2>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#475569', marginBottom: 16, cursor: 'pointer' }}>
-            <input type="checkbox" checked={isAnon} onChange={(e) => setIsAnon(e.target.checked)}
-              style={{ width: 18, height: 18, accentColor: '#6366f1' }} />
-            匿名で支援する
-          </label>
-
-          {!isAnon && (
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
-                お名前 <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-                placeholder="山田 太郎"
-              />
-            </div>
-          )}
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
-              メールアドレス <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-              placeholder="example@email.com"
-            />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, color: '#64748b', marginBottom: 10 }}>口数</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <button
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: 20, cursor: 'pointer', fontWeight: 700 }}
-              >－</button>
-              <span style={{ fontSize: 24, fontWeight: 900, color: '#1e293b', minWidth: 32, textAlign: 'center' }}>{qty}</span>
-              <button
-                onClick={() => setQty((q) => q + 1)}
-                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #e2e8f0', background: '#f8fafc', fontSize: 20, cursor: 'pointer', fontWeight: 700 }}
-              >＋</button>
-            </div>
-          </div>
-
-          {/* 自動昇格バナー */}
-          {upgraded && effectiveTier && (
-            <div style={{
-              margin: '0 0 16px',
-              background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
-              border: '2px solid #f59e0b',
-              borderRadius: 14,
-              padding: '14px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-              <span style={{ fontSize: 24 }}>🎉</span>
-              <div>
-                <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#92400e' }}>
-                  ティア自動昇格！
-                </p>
-                <p style={{ margin: 0, fontSize: 13, color: '#b45309' }}>
-                  ¥{totalAmount.toLocaleString()} の支援で
-                  <strong> {selTier?.name} → {effectiveTier.name} {getTierStyle(effectiveIdx).icon}</strong> に昇格します
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
-              応援メッセージ（任意）
-            </label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={3}
-              style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', fontSize: 15, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-              placeholder="チームへのメッセージをどうぞ"
-            />
-          </div>
-
-          {/* 合計金額 */}
-          <div style={{
-            background: getTierStyle(selIdx).bg,
-            border: getTierStyle(selIdx).border,
-            borderRadius: 14,
-            padding: '16px 20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
-          }}>
-            <span style={{ fontWeight: 700, color: '#374151' }}>合計金額</span>
-            <span style={{ fontSize: 28, fontWeight: 900, color: getTierStyle(selIdx).badge }}>
-              ¥{totalAmount.toLocaleString()}
-            </span>
-          </div>
-
-          {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{error}</p>}
-
-          <button
-            onClick={() => {
-              if (!isAnon && !name.trim()) { setError('お名前を入力してください'); return; }
-              if (!email.trim()) { setError('メールアドレスを入力してください'); return; }
-              if (!selTier) { setError('ティアを選択してください'); return; }
-              setError('');
-              setStep('confirm');
-            }}
-            style={{
-              width: '100%',
-              padding: '16px 0',
-              background: effectiveStyle.selectedBg,
-              border: 'none',
-              borderRadius: 14,
-              fontSize: 16,
-              fontWeight: 800,
-              color: '#fff',
-              cursor: 'pointer',
-              boxShadow: effectiveStyle.glow,
-              letterSpacing: '0.05em',
-            }}
-          >
-            確認画面へ →
+        {error && <div style={{ background: '#ff000020', border: '1px solid #ff4444', borderRadius: 10, padding: 12, color: '#ff6666', fontSize: 13, marginTop: 12 }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+          <button onClick={() => setStep('form')} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>戻る</button>
+          <button onClick={handleSubmit} disabled={submitting} style={{ flex: 2, background: effStyle.grad, color: 'white', border: 'none', borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: `0 4px 20px ${effStyle.glow}40` }}>
+            {submitting ? '送信中...' : `${effStyle.icon} 支援を確定する`}
           </button>
         </div>
       </div>
     </div>
   );
+
+  /* フォーム画面 */
+  return (
+    <div style={{ minHeight: '100vh', background: selStyle.pageBg, transition: 'background 0.9s ease', position: 'relative', paddingBottom: 60 }}>
+      <BackgroundParticles tierName={bgTierName} />
+
+      {rankUp && (
+        <RankUpOverlay
+          fromTier={rankUp.from}
+          toTier={rankUp.to}
+          onDone={() => setRankUp(null)}
+        />
+      )}
+
+      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(16px)', borderBottom: `2px solid ${selStyle.glow}40`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.1)', border: `1px solid ${selStyle.glow}60`, borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>← 戻る</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: 'white', fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{project?.title}</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{project?.school} / {project?.club}</div>
+        </div>
+      </nav>
+
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px', position: 'relative', zIndex: 10 }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ fontSize: 44 }}>{selStyle.icon}</div>
+          <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginTop: 8, textShadow: `0 0 20px ${selStyle.glow}` }}>支援する</h1>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 4 }}>口数に応じてティアが自動アップグレードされます</p>
+        </div>
+
+        {/* ティア選択 */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, marginBottom: 12, letterSpacing: 1 }}>ティアを選択</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {tiers.map((tier) => {
+              const ts = getTierStyle(tier.name);
+              const isSelected = selTier?.name === tier.name;
+              return (
+                <button key={tier.id} onClick={() => handleTierSelect(tier)}
+                  style={{ background: isSelected ? ts.selGrad : ts.grad, border: `2px solid ${isSelected ? ts.glow : 'transparent'}`, borderRadius: 14, padding: '16px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', boxShadow: isSelected ? `0 0 20px ${ts.glow}60` : 'none', transform: isSelected ? 'scale(1.02)' : 'scale(1)', display: 'flex', alignItems: 'center', gap: 16, width: '100%' }}>
+                  <div style={{ fontSize: 36, flexShrink: 0 }}>{ts.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>{tier.name}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>{tier.description}</div>
+                  </div>
+                  <div style={{ color: ts.glow, fontWeight: 800, fontSize: 16, flexShrink: 0 }}>¥{tier.amount.toLocaleString()}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* アップグレードバナー */}
+        {upgraded && (
+          <div style={{ background: `linear-gradient(135deg,${effStyle.glow}30,${effStyle.glow}10)`, border: `1px solid ${effStyle.glow}`, borderRadius: 12, padding: '12px 16px', marginBottom: 20, textAlign: 'center', color: effStyle.glow, fontWeight: 700, fontSize: 14 }}>
+            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}`}</style>
+            ✨ {selTier?.name} → {effectiveTier?.name} 自動アップグレード中！
+          </div>
+        )}
+
+        {/* 口数 */}
+        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '20px', marginBottom: 20, border: '1px solid rgba(255,255,255,0.15)' }}>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>口数を選択</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center' }}>
+            <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', fontSize: 20, cursor: 'pointer', fontWeight: 700 }}>−</button>
+            <span style={{ color: 'white', fontSize: 28, fontWeight: 800, minWidth: 48, textAlign: 'center' }}>{qty}</span>
+            <button onClick={() => setQty(q => q + 1)} style={{ width: 44, height: 44, borderRadius: '50%', background: selStyle.glow, border: 'none', color: 'white', fontSize: 20, cursor: 'pointer', fontWeight: 700, boxShadow: `0 0 12px ${selStyle.glow}60` }}>＋</button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 12, color: effStyle.glow, fontWeight: 800, fontSize: 22 }}>¥{totalAmount.toLocaleString()}</div>
+          {upgraded && <div style={{ textAlign: 'center', fontSize: 12, color: effStyle.glow, marginTop: 4 }}>{effStyle.icon} {effectiveTier?.name} ティア適用中</div>}
+        </div>
+
+        {/* 支援者情報 */}
+        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '20px', marginBottom: 20, border: '1px solid rgba(255,255,255,0.15)' }}>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, marginBottom: 16 }}>支援者情報</div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
+            <input type="checkbox" checked={isAnon} onChange={e => setIsAnon(e.target.checked)} style={{ width: 18, height: 18, accentColor: selStyle.glow }} />
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>匿名で支援する</span>
+          </label>
+          {!isAnon && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, display: 'block', marginBottom: 4 }}>お名前 *</label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="山田 太郎" style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: `1px solid ${selStyle.glow}40`, borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+          )}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, display: 'block', marginBottom: 4 }}>メールアドレス *</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: `1px solid ${selStyle.glow}40`, borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, display: 'block', marginBottom: 4 }}>応援メッセージ（任意）</label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="頑張ってください！" rows={3} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: `1px solid ${selStyle.glow}40`, borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 14, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+
+        {error && <div style={{ background: '#ff000020', border: '1px solid #ff4444', borderRadius: 10, padding: 12, color: '#ff6666', fontSize: 13, marginBottom: 16 }}>{error}</div>}
+
+        <button
+          onClick={() => {
+            if (!isAnon && !name.trim()) { setError('お名前を入力してください'); return; }
+            if (!email.trim()) { setError('メールアドレスを入力してください'); return; }
+            setError(''); setStep('confirm');
+          }}
+          style={{ width: '100%', background: effStyle.grad, border: `2px solid ${effStyle.glow}`, borderRadius: 14, padding: '18px', color: 'white', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: `0 6px 30px ${effStyle.glow}50`, transition: 'all 0.3s', letterSpacing: 1 }}>
+          {effStyle.icon} 確認画面へ進む
+        </button>
+      </div>
+    </div>
+  );
 }
+
