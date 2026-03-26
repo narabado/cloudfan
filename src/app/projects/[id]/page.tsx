@@ -332,7 +332,7 @@ export default function ProjectDetail() {
                       }}>{block.title || CHAPTER_TITLES[i] || `第${i + 1}章`}</h3>
                       {block.image_url && (
                         <img src={block.image_url} alt={`story-${i}`}
-                          style={{ width: '100%', aspectRatio: '16/7', objectFit: 'cover', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block', marginBottom: 20 }} />
+                          style={{ width: '100%', objectFit: 'contain', maxHeight: '500px', width: '100%', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', display: 'block', marginBottom: 20 }} />
                       )}
                       <p style={{ color: '#334155', fontSize: 15, lineHeight: 2.1, margin: 0, whiteSpace: 'pre-wrap' }}>{block.body}</p>
                     </div>
