@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
           </td>
           <td style="width:33%;text-align:center;padding:6px 8px;vertical-align:top;">
             <div style="font-size:26px;margin-bottom:8px;">🎁</div>
-            <div style="font-size:11px;color:#555;line-height:1.6;">返礼品（部員・監督からの直筆メッセージカード）を順次お送りします</div>
+            <div style="font-size:11px;color:#555;line-height:1.6;">お礼メール＋活動報告レポート送付</div>
           </td>
           <td style="width:33%;text-align:center;padding:6px 8px;vertical-align:top;">
             <div style="font-size:26px;margin-bottom:8px;">📧</div>
@@ -212,3 +212,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "サーバーエラーが発生しました" }, { status: 500 });
   }
 }
+
