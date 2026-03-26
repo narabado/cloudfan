@@ -135,7 +135,7 @@ export default function ProjectDetail() {
 
       if (supRows) {
         const rows = supRows as unknown as Supporter[];
-        const approvedRows = (rows ?? []).filter((s: any) => s['status'] === 'approved');
+        const approvedRows = (rows ?? []).filter((s: any) => s['status'] === '承認');
         setSupporters(approvedRows);
         const total = approvedRows.reduce(
           (sum, r) => sum + (Number(r['total_amount']) || 0), 0
@@ -170,10 +170,9 @@ export default function ProjectDetail() {
     ? Math.min(100, Math.round((totalRaised / goalAmount) * 100))
     : 0;
 
-  console.log("SUPPORTERS DATA:", JSON.stringify(supporters));
-  const tierCount: Record<string, number> = {};
+    const tierCount: Record<string, number> = {};
   for (const s of supporters) {
-    const key = String(s['tier_name'] || '');
+    const key = String(s['階層'] || '');
     if (key) tierCount[key] = (tierCount[key] || 0) + 1;
   }
 
