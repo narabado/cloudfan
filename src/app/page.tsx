@@ -43,7 +43,7 @@ export default function TopPage() {
         .select('*')
         .in('status', ['approved', 'active'])
         .order('created_at', { ascending: false });
-      setProjects(pData ?? []);
+      setProjects(pData ?? []); console.log("PROJECT DATA:", JSON.stringify(pData?.[0]));
 
       const { data: sData } = await supabase
         .from('supporters')
