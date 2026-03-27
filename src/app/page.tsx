@@ -82,7 +82,6 @@ export default function TopPage() {
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif" }}>
 
-      {/* ナビゲーション */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: '#1a2e4a',
@@ -98,7 +97,7 @@ export default function TopPage() {
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
             <span style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>CloudFan</span>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={() => document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' })}
               style={{ background: 'none', border: 'none', padding: '8px 14px',
@@ -113,18 +112,17 @@ export default function TopPage() {
                 color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
               支援の流れ
             </button>
-            <button
-              onClick={() => router.push('/admin')}
-              style={{ background: '#d4af37', color: '#1a2e4a', border: 'none',
-                padding: '8px 18px', borderRadius: 8, cursor: 'pointer',
-                fontSize: 14, fontWeight: 700 }}>
+            <a href="/admin"
+              style={{ background: '#d4af37', color: '#1a2e4a',
+                padding: '8px 18px', borderRadius: 8,
+                fontSize: 14, fontWeight: 700,
+                textDecoration: 'none', display: 'inline-block' }}>
               管理
-            </button>
+            </a>
           </div>
         </div>
       </nav>
 
-      {/* ヒーローセクション */}
       <div style={{
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1a2e4a 40%, #1e4d8c 70%, #2563eb 100%)',
         color: '#fff', padding: '80px 24px 72px', textAlign: 'center',
@@ -143,12 +141,11 @@ export default function TopPage() {
           }}>
             🏸 北海道バドミントン・スポーツ支援プラットフォーム
           </div>
-          {/* ★ 一般社団法人 PLUSMIND */}
           <div style={{
             fontSize: 13, color: 'rgba(255,255,255,0.65)',
             marginBottom: 24, letterSpacing: '0.08em', fontWeight: 500,
           }}>
-            運営：一般社団法人 PLUSMIND
+            運営：一般社団法人　Plus Mind
           </div>
           <h1 style={{ fontSize: 'clamp(26px, 5vw, 48px)', fontWeight: 900,
             lineHeight: 1.3, marginBottom: 20, letterSpacing: '-0.02em' }}>
@@ -188,7 +185,6 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* 統計バー */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, textAlign: 'center' }}>
@@ -212,7 +208,6 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* プロジェクト一覧 */}
       <div id="projects" style={{ padding: '64px 24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#1a2e4a', marginBottom: 8 }}>
@@ -263,7 +258,6 @@ export default function TopPage() {
                       : '0 2px 16px rgba(0,0,0,0.08)';
                   }}>
 
-                  {/* 目標達成リボン */}
                   {over100 && (
                     <div style={{
                       position: 'absolute', top: 16, left: -2, zIndex: 10,
@@ -359,7 +353,6 @@ export default function TopPage() {
           </div>
         )}
 
-        {/* フッターCTAボタン */}
         {projects.length > 0 && (
           <div style={{ textAlign: 'center', marginTop: 48 }}>
             <button
@@ -378,7 +371,6 @@ export default function TopPage() {
         )}
       </div>
 
-      {/* 支援できること */}
       <div style={{ background: '#f0f4ff', padding: '56px 24px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -408,7 +400,6 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* 支援の流れ */}
       <div id="how-to" style={{ background: '#f9fafb', padding: '64px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <h2 style={{ textAlign: 'center', fontSize: 26, fontWeight: 800,
@@ -419,7 +410,7 @@ export default function TopPage() {
               { step: '01', icon: '🔍', title: 'プロジェクトを探す', desc: '支援したいチームを見つけましょう' },
               { step: '02', icon: '💎', title: '支援プランを選ぶ',   desc: '¥1,000〜好きな金額のプランを選択' },
               { step: '03', icon: '📝', title: 'フォームに入力',      desc: 'お名前とメールアドレスを入力' },
-              { step: '04', icon: '💳', title: 'お支払いで支援完了',    desc: '支払いコードをメールで受け取り支払い' },
+              { step: '04', icon: '💳', title: 'お支払いで支援完了',  desc: '支払いコードをメールで受け取り支払い' },
             ].map((s) => (
               <div key={s.step} style={{ background: '#fff', borderRadius: 14,
                 padding: 24, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -437,7 +428,6 @@ export default function TopPage() {
             ))}
           </div>
 
-          {/* 支援の流れ下 CTAボタン */}
           {projects.length > 0 && (
             <div style={{ textAlign: 'center', marginTop: 48 }}>
               <button
@@ -456,7 +446,6 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* フッター */}
       <footer style={{ background: '#1a2e4a', color: '#fff', padding: '36px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -470,16 +459,16 @@ export default function TopPage() {
             <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 4 }}>
               北海道バドミントン・スポーツ活動支援プラットフォーム
             </div>
-            <div style={{ fontSize: 12, opacity: 0.45 }}>
-              運営：一般社団法人 PLUSMIND
+            <div style={{ fontSize: 12, opacity: 0.5 }}>
+              運営：一般社団法人　Plus Mind
             </div>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
-            <button onClick={() => router.push('/admin')}
-              style={{ background: 'none', border: 'none',
-                color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 13 }}>
+            <a href="/admin"
+              style={{ color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+                fontSize: 13, textDecoration: 'none' }}>
               管理ログイン
-            </button>
+            </a>
           </div>
         </div>
         <div style={{ maxWidth: 900, margin: '16px auto 0',
