@@ -71,6 +71,8 @@ export default function TopPage() {
   const minDays = projects.length > 0
     ? Math.min(...projects.map((p) => calcDaysLeft(p.deadline)))
     : null;
+
+  // 目標達成プロジェクト（CTAボタン用に最初のプロジェクトIDを取得）
   const firstProject = projects[0] ?? null;
 
   if (showSplash) return (
@@ -125,12 +127,13 @@ export default function TopPage() {
         </div>
       </nav>
 
-      {/* ヒーローセクション */}
+      {/* ヒーローセクション（指示1：文言刷新＋背景デザイン） */}
       <div style={{
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1a2e4a 40%, #1e4d8c 70%, #2563eb 100%)',
         color: '#fff', padding: '80px 24px 72px', textAlign: 'center',
         position: 'relative', overflow: 'hidden',
       }}>
+        {/* CSS装飾：シャトル軌道ライン */}
         <style>{`
           @keyframes shuttleLine {
             0% { transform: translateX(-100%) rotate(-30deg); opacity: 0; }
@@ -144,10 +147,13 @@ export default function TopPage() {
           }
         `}</style>
 
-        {/* コートライン */}
+        {/* コートライン（薄く） */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {/* 縦中央線 */}
           <div style={{ position: 'absolute', left: '50%', top: '10%', bottom: '10%', width: 1, background: 'rgba(255,255,255,0.06)', animation: 'courtPulse 4s ease-in-out infinite' }} />
+          {/* 横ネット線 */}
           <div style={{ position: 'absolute', left: '15%', right: '15%', top: '50%', height: 1, background: 'rgba(255,255,255,0.06)', animation: 'courtPulse 4s ease-in-out infinite 1s' }} />
+          {/* 外枠 */}
           <div style={{ position: 'absolute', left: '15%', right: '15%', top: '10%', bottom: '10%', border: '1px solid rgba(255,255,255,0.04)', animation: 'courtPulse 4s ease-in-out infinite 2s' }} />
         </div>
 
@@ -159,7 +165,11 @@ export default function TopPage() {
             { top: '70%', delay: '5s', width: '40%' },
           ].map((line, i) => (
             <div key={i} style={{
-              position: 'absolute', top: line.top, left: 0, width: line.width, height: 2,
+              position: 'absolute',
+              top: line.top,
+              left: 0,
+              width: line.width,
+              height: 2,
               background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), rgba(212,175,55,0.8), transparent)',
               borderRadius: 2,
               animation: `shuttleLine 6s ${line.delay} ease-in-out infinite`,
@@ -167,8 +177,11 @@ export default function TopPage() {
           ))}
         </div>
 
-        <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, background: 'rgba(255,255,255,0.03)', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', bottom: -80, left: -40, width: 400, height: 400, background: 'rgba(255,255,255,0.02)', borderRadius: '50%' }} />
+        {/* 背景の丸 */}
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300,
+          background: 'rgba(255,255,255,0.03)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', bottom: -80, left: -40, width: 400, height: 400,
+          background: 'rgba(255,255,255,0.02)', borderRadius: '50%' }} />
 
         <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
           <div style={{
@@ -180,6 +193,7 @@ export default function TopPage() {
             🏸 北海道バドミントン・スポーツ支援プラットフォーム
           </div>
 
+          {/* 指示1：新メインコピー */}
           <h1 style={{ fontSize: 'clamp(24px, 4.5vw, 46px)', fontWeight: 900,
             lineHeight: 1.3, marginBottom: 20, letterSpacing: '-0.02em' }}>
             北海道から、世界へ。<br />
@@ -187,6 +201,7 @@ export default function TopPage() {
             <span style={{ color: '#f5d060' }}>あなたの手で「勝利」に変える。</span>
           </h1>
 
+          {/* 指示1：新サブコピー */}
           <p style={{ fontSize: 'clamp(13px, 1.8vw, 16px)', opacity: 0.9,
             lineHeight: 2.0, marginBottom: 40, maxWidth: 520, margin: '0 auto 40px',
             color: 'rgba(255,255,255,0.88)' }}>
@@ -202,6 +217,7 @@ export default function TopPage() {
                 padding: '16px 40px', borderRadius: 40, fontSize: 16,
                 fontWeight: 800, cursor: 'pointer',
                 boxShadow: '0 4px 20px rgba(212,175,55,0.5)',
+                transition: 'transform 0.2s',
               }}
               onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
               onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}>
@@ -218,33 +234,10 @@ export default function TopPage() {
               支援の流れを見る
             </button>
           </div>
-
-          {/* ✅ 一般社団法人PLUSMIND */}
-          <div style={{
-            marginTop: 40,
-            paddingTop: 28,
-            borderTop: '1px solid rgba(255,255,255,0.15)',
-          }}>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, letterSpacing: '0.1em', marginBottom: 8 }}>
-              OPERATED BY
-            </p>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 10,
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 12, padding: '10px 24px',
-            }}>
-              <img src="/narabado-logo.png" alt="PLUSMIND" style={{ height: 28, borderRadius: '50%' }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-              <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 700, letterSpacing: '0.05em' }}>
-                一般社団法人 PLUSMIND
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* 数字セクション */}
+      {/* 数字セクション（指示2：勢い演出） */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '28px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, textAlign: 'center' }}>
@@ -256,8 +249,10 @@ export default function TopPage() {
           ].map((s) => (
             <div key={s.label} style={{ padding: '10px 0' }}>
               <div style={{ fontSize: 26, marginBottom: 6 }}>{s.icon}</div>
+              {/* 指示2：総支援金額だけ青色・太字 */}
               <div style={{
-                fontSize: 'clamp(18px,3vw,28px)', fontWeight: 900,
+                fontSize: 'clamp(18px,3vw,28px)',
+                fontWeight: 900,
                 color: s.highlight ? '#2563eb' : '#1a2e4a',
                 textShadow: s.highlight ? '0 0 20px rgba(37,99,235,0.3)' : 'none',
               }}>
@@ -269,7 +264,7 @@ export default function TopPage() {
         </div>
       </div>
 
-      {/* プロジェクトセクション */}
+      {/* プロジェクトセクション（指示3：カード強化） */}
       <div id="projects" style={{ padding: '64px 24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#1a2e4a', marginBottom: 8 }}>
@@ -288,7 +283,10 @@ export default function TopPage() {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: projects.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+            // 指示3：カード大きく（1件なら1列大きく、複数なら2列）
+            gridTemplateColumns: projects.length === 1
+              ? '1fr'
+              : 'repeat(auto-fill, minmax(400px, 1fr))',
             gap: 32,
             maxWidth: projects.length === 1 ? 680 : '100%',
             margin: '0 auto',
@@ -307,27 +305,29 @@ export default function TopPage() {
                 <div key={p.id}
                   style={{
                     background: '#fff', borderRadius: 20, overflow: 'hidden',
+                    // 指示3：目標達成カードは強調ボーダー
                     boxShadow: over100
                       ? '0 8px 40px rgba(212,175,55,0.35), 0 2px 16px rgba(0,0,0,0.1)'
                       : '0 2px 16px rgba(0,0,0,0.08)',
-                    cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
                     border: over100 ? '2px solid #d4af37' : '1px solid #e5e7eb',
                     position: 'relative',
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-6px)';
                     (e.currentTarget as HTMLDivElement).style.boxShadow = over100
-                      ? '0 20px 60px rgba(212,175,55,0.4)'
+                      ? '0 20px 60px rgba(212,175,55,0.4), 0 4px 24px rgba(0,0,0,0.15)'
                       : '0 12px 36px rgba(0,0,0,0.15)';
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
                     (e.currentTarget as HTMLDivElement).style.boxShadow = over100
-                      ? '0 8px 40px rgba(212,175,55,0.35)'
+                      ? '0 8px 40px rgba(212,175,55,0.35), 0 2px 16px rgba(0,0,0,0.1)'
                       : '0 2px 16px rgba(0,0,0,0.08)';
                   }}>
 
-                  {/* リボン */}
+                  {/* 指示3：目標達成リボン */}
                   {over100 && (
                     <div style={{
                       position: 'absolute', top: 18, left: -8, zIndex: 10,
@@ -349,13 +349,16 @@ export default function TopPage() {
                     ) : (
                       <div style={{ width: '100%', height: '100%',
                         background: 'linear-gradient(135deg,#1a2e4a,#2563eb)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 64 }}>🏸</div>
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 64 }}>🏸</div>
                     )}
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.65) 0%,transparent 55%)' }} />
+                    <div style={{ position: 'absolute', inset: 0,
+                      background: 'linear-gradient(to top,rgba(0,0,0,0.65) 0%,transparent 55%)' }} />
                     <div style={{
                       position: 'absolute', top: 12, right: 12,
                       background: daysLeft <= 7 ? '#dc2626' : '#1a2e4a',
-                      color: '#fff', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                      color: '#fff', padding: '4px 12px', borderRadius: 20,
+                      fontSize: 12, fontWeight: 700,
                     }}>
                       {daysLeft === 0 ? '期限未設定' : '残り' + daysLeft + '日'}
                     </div>
@@ -399,6 +402,7 @@ export default function TopPage() {
                       {p.description}
                     </p>
 
+                    {/* 指示3：ボタン強調（目標達成カードは黄色ボタン） */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
                       <button
                         onClick={() => router.push('/projects/' + p.id)}
@@ -411,6 +415,7 @@ export default function TopPage() {
                         onClick={() => router.push('/projects/' + p.id + '#tiers')}
                         style={{
                           padding: '13px 8px', border: 'none', borderRadius: 12,
+                          // 指示3：目標達成カードは黄色・最強調
                           background: over100
                             ? 'linear-gradient(135deg,#d4af37,#f5d060)'
                             : 'linear-gradient(135deg,#1a2e4a,#2563eb)',
@@ -419,6 +424,7 @@ export default function TopPage() {
                           boxShadow: over100
                             ? '0 4px 16px rgba(212,175,55,0.5)'
                             : '0 4px 16px rgba(37,99,235,0.3)',
+                          letterSpacing: '0.02em',
                         }}>
                         {over100 ? '🏆 今すぐ応援する（寄付へ）' : '⭐ 今すぐ支援'}
                       </button>
@@ -464,8 +470,10 @@ export default function TopPage() {
       {/* 支援の流れ */}
       <div id="how-to" style={{ background: '#f9fafb', padding: '64px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <h2 style={{ textAlign: 'center', fontSize: 26, fontWeight: 800, color: '#1a2e4a', marginBottom: 48 }}>支援の流れ</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 24 }}>
+          <h2 style={{ textAlign: 'center', fontSize: 26, fontWeight: 800,
+            color: '#1a2e4a', marginBottom: 48 }}>支援の流れ</h2>
+          <div style={{ display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 24 }}>
             {[
               { step: '01', icon: '🔍', title: 'プロジェクトを探す', desc: '支援したいチームを見つけましょう' },
               { step: '02', icon: '💎', title: '支援プランを選ぶ',   desc: '¥1,000〜好きな金額のプランを選択' },
@@ -488,7 +496,7 @@ export default function TopPage() {
             ))}
           </div>
 
-          {/* フッターCTAボタン */}
+          {/* 指示4：支援の流れ下の大きなCTAボタン */}
           {firstProject && (
             <div style={{ textAlign: 'center', marginTop: 56 }}>
               <p style={{ color: '#4b5563', fontSize: 15, marginBottom: 20, fontWeight: 600 }}>
@@ -503,6 +511,7 @@ export default function TopPage() {
                   fontSize: 17, fontWeight: 900, cursor: 'pointer',
                   boxShadow: '0 6px 32px rgba(212,175,55,0.5)',
                   letterSpacing: '0.03em',
+                  transition: 'transform 0.2s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}>
@@ -529,9 +538,6 @@ export default function TopPage() {
             </div>
             <div style={{ fontSize: 13, opacity: 0.6 }}>
               北海道バドミントン・スポーツ活動支援プラットフォーム
-            </div>
-            <div style={{ fontSize: 12, opacity: 0.45, marginTop: 4 }}>
-              運営：一般社団法人 PLUSMIND
             </div>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
