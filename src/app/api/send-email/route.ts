@@ -44,9 +44,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "DB保存に失敗しました" }, { status: 500 });
     }
 
-    // ✅ 振込期限を申込日から7日後に設定
     const deadline = new Date();
-    deadline.setDate(deadline.getDate() + 7);
+    deadline.setDate(deadline.getDate() + 14);
     const deadlineStr = `${deadline.getFullYear()}年${deadline.getMonth() + 1}月${deadline.getDate()}日`;
     const deadlineDay = ["日","月","火","水","木","金","土"][deadline.getDay()];
     const deadlineFull = `${deadlineStr}（${deadlineDay}）`;
@@ -206,11 +205,11 @@ export async function POST(req: NextRequest) {
       html:    adminHtml,
     });
 
-    // ✅ transferDeadline をレスポンスに含めて完了画面で使用できるようにする
-    return NextResponse.json({ success: true, transferCode, transferDeadline: deadlineFull });
+    return NextResponse.json({ success: true, transferCode });
 
   } catch (err) {
     console.error("Send-email error:", err);
     return NextResponse.json({ error: "サーバーエラーが発生しました" }, { status: 500 });
   }
 }
+
