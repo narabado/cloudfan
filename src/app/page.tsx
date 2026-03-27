@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -82,6 +82,7 @@ export default function TopPage() {
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif" }}>
 
+      {/* ナビゲーション */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: '#1a2e4a',
@@ -123,6 +124,7 @@ export default function TopPage() {
         </div>
       </nav>
 
+      {/* ヒーローセクション */}
       <div style={{
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1a2e4a 40%, #1e4d8c 70%, #2563eb 100%)',
         color: '#fff', padding: '80px 24px 72px', textAlign: 'center',
@@ -137,19 +139,29 @@ export default function TopPage() {
             display: 'inline-flex', alignItems: 'center', gap: 8,
             background: 'rgba(212,175,55,0.2)', border: '1px solid rgba(212,175,55,0.5)',
             borderRadius: 99, padding: '6px 20px', fontSize: 13, fontWeight: 700,
-            marginBottom: 28, letterSpacing: '0.05em', color: '#f5d060',
+            marginBottom: 16, letterSpacing: '0.05em', color: '#f5d060',
           }}>
             🏸 北海道バドミントン・スポーツ支援プラットフォーム
           </div>
+          {/* ★ 一般社団法人 PLUSMIND */}
+          <div style={{
+            fontSize: 13, color: 'rgba(255,255,255,0.65)',
+            marginBottom: 24, letterSpacing: '0.08em', fontWeight: 500,
+          }}>
+            運営：一般社団法人 PLUSMIND
+          </div>
           <h1 style={{ fontSize: 'clamp(26px, 5vw, 48px)', fontWeight: 900,
             lineHeight: 1.3, marginBottom: 20, letterSpacing: '-0.02em' }}>
-            北海道バドミントン部・<br />クラブチームの夢を<br />みんなで支援しよう！
+            北海道から、世界へ。<br />
+            コートに懸ける青春を、<br />
+            あなたの手で『勝利』に変える。
           </h1>
           <p style={{ fontSize: 'clamp(14px, 2vw, 17px)', opacity: 0.85,
             lineHeight: 1.9, marginBottom: 40, maxWidth: 500, margin: '0 auto 40px' }}>
-            遠征費・用具費・大会参加費などの<br />
-            北海道のバドミントン部・クラブチームの<br />
-            活動をクラウドファンディングで支援できます
+            物価高騰や遠征費の壁に挑む、<br />
+            道内のバドミントン部・クラブチーム。<br />
+            彼らの『あと一歩』を支える、<br />
+            クラウドファンディング・プラットフォーム。
           </p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
@@ -176,18 +188,22 @@ export default function TopPage() {
         </div>
       </div>
 
+      {/* 統計バー */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, textAlign: 'center' }}>
           {[
-            { label: '総支援金額',         value: '¥' + fmt(totalAmount),               icon: '💰' },
-            { label: '支援者数',           value: fmt(totalSupporters) + '人',            icon: '👥' },
+            { label: '総支援金額',         value: '¥' + fmt(totalAmount),               icon: '🪙' },
+            { label: '支援者数',           value: fmt(totalSupporters) + '人',            icon: '✊' },
             { label: '募集中プロジェクト', value: projects.length + '件',                 icon: '🏸' },
             { label: '最短残り日数',       value: minDays !== null ? minDays + '日' : '—', icon: '⏰' },
-          ].map((s) => (
+          ].map((s, i) => (
             <div key={s.label} style={{ padding: '8px 0' }}>
               <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
-              <div style={{ fontSize: 'clamp(18px,3vw,26px)', fontWeight: 800, color: '#1a2e4a' }}>
+              <div style={{
+                fontSize: 'clamp(18px,3vw,26px)', fontWeight: 900,
+                color: i === 0 ? '#1a56db' : '#1a2e4a',
+              }}>
                 {s.value}
               </div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{s.label}</div>
@@ -196,6 +212,7 @@ export default function TopPage() {
         </div>
       </div>
 
+      {/* プロジェクト一覧 */}
       <div id="projects" style={{ padding: '64px 24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#1a2e4a', marginBottom: 8 }}>
@@ -225,17 +242,42 @@ export default function TopPage() {
               const count    = supporterCounts[p.id] ?? 0;
               return (
                 <div key={p.id}
-                  style={{ background: '#fff', borderRadius: 18, overflow: 'hidden',
-                    boxShadow: '0 2px 16px rgba(0,0,0,0.08)', cursor: 'pointer',
-                    transition: 'transform 0.2s, box-shadow 0.2s', border: '1px solid #e5e7eb' }}
+                  style={{
+                    background: '#fff', borderRadius: 18, overflow: 'hidden',
+                    boxShadow: over100
+                      ? '0 4px 24px rgba(212,175,55,0.35)'
+                      : '0 2px 16px rgba(0,0,0,0.08)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    border: over100 ? '2px solid #d4af37' : '1px solid #e5e7eb',
+                    position: 'relative',
+                  }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
                     (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 36px rgba(0,0,0,0.15)';
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 16px rgba(0,0,0,0.08)';
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = over100
+                      ? '0 4px 24px rgba(212,175,55,0.35)'
+                      : '0 2px 16px rgba(0,0,0,0.08)';
                   }}>
+
+                  {/* 目標達成リボン */}
+                  {over100 && (
+                    <div style={{
+                      position: 'absolute', top: 16, left: -2, zIndex: 10,
+                      background: 'linear-gradient(135deg,#dc2626,#f59e0b)',
+                      color: '#fff', fontSize: 11, fontWeight: 800,
+                      padding: '5px 14px 5px 12px',
+                      borderRadius: '0 20px 20px 0',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      letterSpacing: '0.03em',
+                    }}>
+                      🎯 目標達成！ネクストゴール挑戦中
+                    </div>
+                  )}
+
                   <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: '#e2e8f0' }}>
                     {p.image_url ? (
                       <img src={p.image_url} alt={p.title}
@@ -302,9 +344,12 @@ export default function TopPage() {
                       <button
                         onClick={() => router.push('/projects/' + p.id + '#tiers')}
                         style={{ padding: '11px 8px', border: 'none', borderRadius: 10,
-                          background: 'linear-gradient(135deg,#1a2e4a,#2563eb)',
-                          color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                        ⭐ 今すぐ支援
+                          background: over100
+                            ? 'linear-gradient(135deg,#d97706,#fbbf24)'
+                            : 'linear-gradient(135deg,#1a2e4a,#2563eb)',
+                          color: over100 ? '#1a2e4a' : '#fff',
+                          fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                        {over100 ? '⭐ 今すぐ応援する' : '⭐ 今すぐ支援'}
                       </button>
                     </div>
                   </div>
@@ -313,8 +358,27 @@ export default function TopPage() {
             })}
           </div>
         )}
+
+        {/* フッターCTAボタン */}
+        {projects.length > 0 && (
+          <div style={{ textAlign: 'center', marginTop: 48 }}>
+            <button
+              onClick={() => router.push('/projects/' + projects[0].id + '#tiers')}
+              style={{
+                background: 'linear-gradient(135deg,#d97706,#fbbf24)',
+                color: '#1a2e4a', border: 'none',
+                padding: '18px 48px', borderRadius: 40,
+                fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                boxShadow: '0 4px 24px rgba(212,175,55,0.45)',
+                letterSpacing: '0.02em',
+              }}>
+              🏸 現在募集中のプロジェクトを応援する →
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* 支援できること */}
       <div style={{ background: '#f0f4ff', padding: '56px 24px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -344,6 +408,7 @@ export default function TopPage() {
         </div>
       </div>
 
+      {/* 支援の流れ */}
       <div id="how-to" style={{ background: '#f9fafb', padding: '64px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <h2 style={{ textAlign: 'center', fontSize: 26, fontWeight: 800,
@@ -371,9 +436,27 @@ export default function TopPage() {
               </div>
             ))}
           </div>
+
+          {/* 支援の流れ下 CTAボタン */}
+          {projects.length > 0 && (
+            <div style={{ textAlign: 'center', marginTop: 48 }}>
+              <button
+                onClick={() => router.push('/projects/' + projects[0].id + '#tiers')}
+                style={{
+                  background: 'linear-gradient(135deg,#d97706,#fbbf24)',
+                  color: '#1a2e4a', border: 'none',
+                  padding: '18px 48px', borderRadius: 40,
+                  fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                  boxShadow: '0 4px 24px rgba(212,175,55,0.45)',
+                }}>
+                🏸 現在募集中のプロジェクト（北星女子）を応援する
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* フッター */}
       <footer style={{ background: '#1a2e4a', color: '#fff', padding: '36px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -384,8 +467,11 @@ export default function TopPage() {
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
               <span style={{ fontSize: 20, fontWeight: 800 }}>CloudFan</span>
             </div>
-            <div style={{ fontSize: 13, opacity: 0.6 }}>
+            <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 4 }}>
               北海道バドミントン・スポーツ活動支援プラットフォーム
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.45 }}>
+              運営：一般社団法人 PLUSMIND
             </div>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
@@ -406,4 +492,3 @@ export default function TopPage() {
     </div>
   );
 }
-
