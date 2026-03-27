@@ -272,6 +272,8 @@ export default function SupportPage() {
   const [rankUp, setRankUp] = useState<{ from: string; to: string } | null>(null);
   const prevEffTierRef = useRef<string>('');
   const [bgTierName, setBgTierName] = useState<string>('ブロンズ');
+  // ✅ 振込期限をstateで管理
+  const [transferDeadline, setTransferDeadline] = useState<string>('');
 
   useEffect(() => {
     if (!id) return;
@@ -322,7 +324,6 @@ export default function SupportPage() {
     setQty(1);
   };
 
-  // ━━ handleSubmit: /api/send-email 経由でDB保存＋メール送信 ━━
   async function handleSubmit() {
     setSubmitting(true);
     setError('');
@@ -347,6 +348,9 @@ export default function SupportPage() {
         setSubmitting(false);
         return;
       }
+      // ✅ APIから振込期限を受け取って保存
+      if (data.transferDeadline) setTransferDeadline(data.transferDeadline);
+
       setShowFireworks(true);
       const dur = (getTierStyle(effectiveTier?.name ?? 'ブロンズ').fw.launches * 600) + 4000;
       setTimeout(() => setShowFireworks(false), dur);
@@ -366,6 +370,7 @@ export default function SupportPage() {
     </div>
   );
 
+  // ✅ 完了画面：振込期限を表示
   if (step === 'done') return (
     <>
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100 }} />
@@ -380,6 +385,20 @@ export default function SupportPage() {
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 4 }}>支援ティア</div>
             <div style={{ color: effStyle.glow, fontSize: 22, fontWeight: 700 }}>{effStyle.icon} {effectiveTier?.name}</div>
             <div style={{ color: '#FFD700', fontSize: 32, fontWeight: 800, marginTop: 8 }}>¥{totalAmount.toLocaleString()}</div>
+            {/* ✅ 振込期限を表示 */}
+            {transferDeadline && (
+              <div style={{
+                marginTop: 16,
+                background: 'rgba(255,255,255,0.12)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                border: '1px solid rgba(255,100,100,0.5)',
+              }}>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4, letterSpacing: 1 }}>🏦 振込期限</div>
+                <div style={{ color: '#FF6B6B', fontSize: 18, fontWeight: 800 }}>{transferDeadline}</div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 }}>期限内にお振り込みをお願いいたします</div>
+              </div>
+            )}
           </div>
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, marginBottom: 28 }}>振込コードをメールでご確認ください</p>
           <button onClick={() => router.push(`/projects/${id}`)} style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: 12, padding: '14px 36px', fontSize: 15, fontWeight: 700, cursor: 'pointer', width: '100%', boxShadow: '0 4px 20px rgba(102,126,234,0.4)' }}>
