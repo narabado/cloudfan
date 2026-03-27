@@ -225,7 +225,7 @@ export default function TopPage() {
           </div>
         ) : (
           <div style={{ display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 28 }}>
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 28 }}>
             {projects.map((p) => {
               const raised   = raisedAmounts[p.id]   ?? 0;
               const goal = Number((p as any)['目的'] ?? (p as any)['goal'] ?? p.goal_amount ?? 0) || 0;
