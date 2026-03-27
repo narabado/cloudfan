@@ -284,6 +284,9 @@ export default function TopPage() {
                     )}
                     <div style={{ position: 'absolute', inset: 0,
                       background: 'linear-gradient(to top,rgba(0,0,0,0.6) 0%,transparent 55%)' }} />
+                    {over100 && (
+                      <div style={{ position: 'absolute', top: 16, left: 0, background: 'linear-gradient(135deg,#dc2626,#b91c1c)', color: '#fff', padding: '5px 16px 5px 12px', fontSize: 11, fontWeight: 800, borderRadius: '0 20px 20px 0', zIndex: 10, boxShadow: '2px 4px 8px rgba(0,0,0,0.4)', whiteSpace: 'nowrap' }}>🎯 目標達成！ネクストゴール挑戦中</div>
+                    )}
                     <div style={{
                       position: 'absolute', top: 12, right: 12,
                       background: daysLeft <= 7 ? '#dc2626' : '#1a2e4a',
@@ -317,7 +320,7 @@ export default function TopPage() {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
                         <span style={{ fontSize: 12, color: '#6b7280' }}>目標: ¥{fmt(goal)}</span>
-                        <span style={{ fontSize: 12, color: '#6b7280' }}>👥 {fmt(count)}名が支援</span>
+                        <span style={{ fontSize: 12, color: '#6b7280' }}>✊ {fmt(count)}名が支援</span>
                       </div>
                     </div>
 
