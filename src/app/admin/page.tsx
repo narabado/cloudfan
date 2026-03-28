@@ -18,6 +18,8 @@ interface Supporter {
   message: string | null;
   transfer_code: string | null;
   created_at: string;
+  is_anonymous?: boolean;
+  is_anonymous?: boolean;
 }
 
 interface Tier {
