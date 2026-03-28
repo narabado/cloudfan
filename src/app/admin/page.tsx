@@ -303,7 +303,7 @@ export default function AdminPage() {
                         <td style={{ padding: '11px 14px', color: '#6b7280', whiteSpace: 'nowrap' }}>
                           {new Date(s.created_at).toLocaleDateString('ja-JP')}
                         </td>
-                        <td style={{ padding: '11px 14px', fontWeight: 500 }}>{s.name}</td>
+                        <td style={{ padding: '11px 14px', fontWeight: 500, color: '#1a2e4a' }}>{s.name}</td>
                         <td style={{ padding: '11px 14px', color: '#374151' }}>{prjName}</td>
                         <td style={{ padding: '11px 14px', color: '#6b7280' }}>{s.tier || '-'}</td>
                         <td style={{ padding: '11px 14px', fontWeight: 600, color: '#1a3a5c' }}>
