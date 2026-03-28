@@ -20,6 +20,7 @@ interface Supporter {
   created_at: string;
   is_anonymous?: boolean;
   is_anonymous?: boolean;
+  is_anonymous?: boolean;
 }
 
 interface Tier {
