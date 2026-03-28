@@ -326,6 +326,7 @@ export default function SupportPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError('');
+    console.log('DEBUG isAnon:', isAnon, 'name:', name);
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
