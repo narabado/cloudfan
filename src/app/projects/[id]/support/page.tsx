@@ -331,7 +331,8 @@ export default function SupportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          supporterName: isAnon ? '匿名' : name,
+          supporterName: name,
+          isAnonymous: isAnon,
           supporterEmail: email,
           tier: effectiveTier?.name ?? selTier?.name ?? '',
           units: qty,
