@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -497,12 +497,11 @@ export default function SupportPage() {
             <input type="checkbox" checked={isAnon} onChange={e => setIsAnon(e.target.checked)} style={{ width: 18, height: 18, accentColor: selStyle.glow }} />
             <span style={{ color: textColor, fontSize: 14 }}>匿名で支援する</span>
           </label>
-          {!isAnon && (
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: subTextColor, fontSize: 12, display: 'block', marginBottom: 4 }}>お名前 *</label>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="山田 太郎" style={{ width: '100%', background: 'rgba(255,255,255,0.85)', border: `1.5px solid ${selStyle.glow}70`, borderRadius: 8, padding: '10px 12px', color: textColor, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
-            </div>
-          )}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: subTextColor, fontSize: 12, display: 'block', marginBottom: 4 }}>お名前 *{isAnon && <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>（管理者のみ確認できます）</span>}</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="山田 太郎" style={{ width: '100%', background: 'rgba(255,255,255,0.85)', border: `1.5px solid ${selStyle.glow}70`, borderRadius: 8, padding: '10px 12px', color: textColor, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+            {isAnon && <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>✓ 公開時は「匿名」と表示されます</p>}
+          </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: subTextColor, fontSize: 12, display: 'block', marginBottom: 4 }}>メールアドレス *</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" style={{ width: '100%', background: 'rgba(255,255,255,0.85)', border: `1.5px solid ${selStyle.glow}70`, borderRadius: 8, padding: '10px 12px', color: textColor, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
@@ -517,7 +516,7 @@ export default function SupportPage() {
 
         <button
           onClick={() => {
-            if (!isAnon && !name.trim()) { setError('お名前を入力してください'); return; }
+            if (!name.trim()) { setError('お名前を入力してください'); return; }
             if (!email.trim()) { setError('メールアドレスを入力してください'); return; }
             setError(''); setStep('confirm');
           }}
