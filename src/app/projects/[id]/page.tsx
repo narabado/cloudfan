@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -640,7 +640,7 @@ export default function ProjectDetail() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontWeight: 800, color: '#1a2e4a', fontSize: isTop3 ? (isMobile ? 14 : 16) : 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {String(s['name'] || s['名前'] || '匿名サポーター')}
+                              {s.is_anonymous ? '匿名' : String(s['name'] || s['名前'] || '匿名サポーター')}
                             </span>
                             <span style={{ fontWeight: 900, fontSize: isTop3 ? (isMobile ? 18 : 22) : 16, color: idx === 0 ? '#d97706' : idx === 1 ? '#64748b' : idx === 2 ? '#ea580c' : '#2563eb', flexShrink: 0 }}>
                               ¥{amount.toLocaleString()}

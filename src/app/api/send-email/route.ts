@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
 
@@ -22,7 +22,7 @@ async function generateTransferCode(): Promise<string> {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { supporterName, supporterEmail, tier, units, totalAmount, message, projectTitle, projectId } = body;
+    const { supporterName, supporterEmail, tier, units, totalAmount, message, projectTitle, projectId, isAnonymous } = body;
 
     const transferCode = await generateTransferCode();
 
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
       transfer_code: transferCode,
       status:        "pending",
       message:       message || "",
+      is_anonymous:  isAnonymous ?? false,
     });
 
     if (insertError) {

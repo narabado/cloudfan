@@ -38,6 +38,7 @@ function SupportPageInner() {
   const [email,        setEmail]        = useState("");
   const [message,      setMessage]      = useState("");
   const [transferCode, setTransferCode] = useState("");
+  const [isAnonymous,  setIsAnonymous]  = useState(false);
   const [submitting,   setSubmitting]   = useState(false);
   const [error,        setError]        = useState("");
 
@@ -75,6 +76,7 @@ function SupportPageInner() {
           totalAmount,
           message:        message.trim(),
           projectTitle:   PROJECT_TITLE,
+          isAnonymous:    isAnonymous,
         }),
       });
 
@@ -269,6 +271,7 @@ function SupportPageInner() {
               <div className="form-group">
                 <label className="form-label">お名前 <span style={{ color:"#e55" }}>*</span></label>
                 <input className="form-input" placeholder="山田 太郎" value={name} onChange={e => setName(e.target.value)} />
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontSize: 14, color: "#333" }}><input type="checkbox" checked={isAnonymous} onChange={e => setIsAnonymous(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#d4af37" }} /><span>匿名で応援する <span style={{ fontSize: 12, color: "#888" }}>（支援者一覧には「匿名」と表示されます）</span></span></label>
               </div>
               <div className="form-group">
                 <label className="form-label">メールアドレス <span style={{ color:"#e55" }}>*</span></label>
