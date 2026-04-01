@@ -18,7 +18,6 @@ interface Supporter {
   message: string | null;
   transfer_code: string | null;
   created_at: string;
-}
 
 interface Tier {
   id: number;
