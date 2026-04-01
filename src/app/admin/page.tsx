@@ -18,9 +18,6 @@ interface Supporter {
   message: string | null;
   transfer_code: string | null;
   created_at: string;
-  is_anonymous?: boolean;
-  is_anonymous?: boolean;
-  is_anonymous?: boolean;
 }
 
 interface Tier {
@@ -308,7 +305,7 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: '11px 14px', fontWeight: 500, color: '#1a2e4a' }}>
                           {s.name}
-                          {s.is_anonymous && <span style={{ marginLeft: 6, fontSize: 11, background: '#e0e7ff', color: '#3730a3', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>匿名</span>}
+                          {(s as any).is_anonymous && <span style={{ marginLeft: 6, fontSize: 11, background: '#e0e7ff', color: '#3730a3', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>匿名</span>}
                         </td>
                         <td style={{ padding: '11px 14px', color: '#374151' }}>{prjName}</td>
                         <td style={{ padding: '11px 14px', color: '#6b7280' }}>{s.tier || '-'}</td>
