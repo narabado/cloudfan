@@ -286,7 +286,7 @@ export default function AdminPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
-                    {['日時', '名前', 'プロジェクト', 'コース', '金額(¥)', 'ステータス', '振込コード', '操作'].map(h => (
+                    {['日時', '名前', 'プロジェクト', 'コース', '金額(¥)', 'ステータス', '振込コード', 'メッセージ', '操作'].map(h => (
                       <th key={h} style={{
                         padding: '12px 14px', textAlign: 'left', fontWeight: 600,
                         color: '#374151', whiteSpace: 'nowrap',
@@ -323,6 +323,11 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: '#374151' }}>
                           {s.transfer_code || '-'}
+                        </td>
+                        <td style={{ padding: '11px 14px', color: '#374151', maxWidth: '180px', verticalAlign: 'top' }}>
+                          <span style={{ display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.85rem' }}>
+                            {s.message || '-'}
+                          </span>
                         </td>
                         <td style={{ padding: '11px 14px' }}>
                           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
