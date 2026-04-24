@@ -537,7 +537,7 @@ export default function ProjectDetail() {
                     return (
                       <div key={String(s['id'] || idx)} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'flex-start' }}>
                         <div style={{ width: 44, height: 44, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{icon}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s['is_anonymous'] ? '匿名' : String(s['name'] || s['名前'] || '匿名サポーター')}</span>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontWeight: 700, color: '#1a2e4a', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(s['name'] || s['名前'] || '名前未設定')}</span>
                             <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 16, flexShrink: 0 }}>¥{amount.toLocaleString()}</span>
