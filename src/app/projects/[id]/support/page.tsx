@@ -495,10 +495,10 @@ export default function SupportPage() {
 
         <div style={{ background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(8px)', borderRadius: 16, padding: '20px', marginBottom: 20, border: `1.5px solid ${selStyle.glow}60`, boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
           <div style={{ color: textColor, fontSize: 13, fontWeight: 600, marginBottom: 16 }}>支援者情報</div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
-            <input type="checkbox" checked={isAnon} onChange={e => setIsAnon(e.target.checked)} style={{ width: 18, height: 18, accentColor: selStyle.glow }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }} onClick={() => setIsAnon(prev => !prev)}>
+            <input type="checkbox" checked={isAnon} onChange={() => {}} style={{ width: 18, height: 18, accentColor: selStyle.glow, pointerEvents: 'none' }} />
             <span style={{ color: textColor, fontSize: 14 }}>匿名で支援する</span>
-          </label>
+          </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: subTextColor, fontSize: 12, display: 'block', marginBottom: 4 }}>お名前 *{isAnon && <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>（管理者のみ確認できます）</span>}</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="山田 太郎" style={{ width: '100%', background: 'rgba(255,255,255,0.85)', border: `1.5px solid ${selStyle.glow}70`, borderRadius: 8, padding: '10px 12px', color: textColor, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
