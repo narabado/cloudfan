@@ -104,6 +104,44 @@ export default function AdminPage() {
     setSupporters(prev => prev.map(s => s.id === id ? { ...s, status } : s));
   }
 
+  function exportCSV(filterStatus: 'all' | 'approved' | 'pending') {
+    const statusMap: Record<string, string> = {
+      pending: '保留中', approved: '承認済み', rejected: '却下', cancelled: 'キャンセル',
+    };
+    const labelMap = { all: '全件', approved: '承認済み', pending: '保留中' };
+    const target = filterStatus === 'all'
+      ? supporters
+      : supporters.filter(s => s.status === filterStatus);
+
+    const header = ['氏名', 'メールアドレス', '金額', 'ステータス', '振込コード', 'プロジェクト', '支援日', 'コメント'];
+    const rows = target.map(s => {
+      const prjName = projects.find(p => p.id === s.project_id)?.title || `ID:${s.project_id}`;
+      const statusJa = statusMap[s.status] || s.status;
+      const date = s.created_at ? new Date(s.created_at).toLocaleDateString('ja-JP') : '';
+      return [
+        s.name || '',
+        (s as any).email || '',
+        String(s.total_amount || 0),
+        statusJa,
+        (s as any).transfer_code || '',
+        prjName,
+        date,
+        s.message || '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+    const filename = `supporters_${labelMap[filterStatus]}_${dateStr}.csv`;
+    const bom = '\uFEFF';
+    const csv = bom + [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function deleteSupporter(id: number) {
     if (!confirm('この支援者を完全に削除しますか？この操作は取り消せません。')) return;
     setDeletingId(id);
@@ -282,6 +320,12 @@ export default function AdminPage() {
             </div>
 
             {/* テーブル */}
+              {/* CSVエクスポートボタン */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, marginBottom: 12 }}>
+                <button onClick={() => exportCSV('all')} style={{ padding: '7px 14px', background: '#374151', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}>📥 全件 CSV</button>
+                <button onClick={() => exportCSV('approved')} style={{ padding: '7px 14px', background: '#059669', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}>✅ 承認済み CSV</button>
+                <button onClick={() => exportCSV('pending')} style={{ padding: '7px 14px', background: '#d97706', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}>⏳ 保留中 CSV</button>
+              </div>
             <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 1px 8px rgba(0,0,0,0.08)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                 <thead>
