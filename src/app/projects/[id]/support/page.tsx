@@ -359,6 +359,40 @@ export default function SupportPage() {
     setSubmitting(false);
   }
 
+  async function handleStripeCheckout() {
+    if (!name.trim()) { setError('お名前を入力してください'); return; }
+    if (!email.trim()) { setError('メールアドレスを入力してください'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: id,
+          projectTitle: project?.title ?? '',
+          supporterName: name,
+          supporterEmail: email,
+          tierName: effectiveTier?.name ?? selTier?.name ?? '',
+          quantity: qty,
+          totalAmount,
+          message: message || '',
+          isAnonymous: isAnon,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(`エラー: ${data.error ?? 'Stripeエラー'}`);
+        setSubmitting(false);
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setError('通信エラーが発生しました');
+      setSubmitting(false);
+    }
+  }
+
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#FFE4C4,#FFDAB9,#FFB87A)' }}>
       <div style={{ background: 'white', borderRadius: 20, padding: 40, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
@@ -421,7 +455,10 @@ export default function SupportPage() {
         <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
           <button onClick={() => setStep('form')} style={{ flex: 1, background: 'rgba(0,0,0,0.06)', color: textColor, border: `1px solid ${effStyle.glow}60`, borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>戻る</button>
           <button onClick={handleSubmit} disabled={submitting} style={{ flex: 2, background: effStyle.grad, color: 'white', border: 'none', borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: `0 4px 20px ${effStyle.glow}50` }}>
-            {submitting ? '送信中...' : `${effStyle.icon} 支援を確定する`}
+            {submitting ? '送信中...' : `${effStyle.icon} 銀行振込で確定`}
+          </button>
+          <button onClick={handleStripeCheckout} disabled={submitting} style={{ flex: 2, background: `linear-gradient(135deg,#6366f1,#8b5cf6)`, color: 'white', border: 'none', borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,0.5)' }}>
+            {submitting ? '処理中...' : '💳 カードで支払う'}
           </button>
         </div>
       </div>
