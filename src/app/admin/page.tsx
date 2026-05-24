@@ -65,7 +65,7 @@ export default function AdminPage() {
   async function fetchAll() {
     setLoading(true);
     const [{ data: sup }, { data: prj }] = await Promise.all([
-      supabase.from('supporters').select('id,name:名称,email:メール,tier:階層,status:状況,message:メッセージ,total_amount,transfer_code,created_at,project_id,is_anonymous').order('created_at', { ascending: false }),
+      supabase.from('supporters').select('*').order('created_at', { ascending: false }),
       supabase.from('crowdfunding_projects').select('*').order('created_at', { ascending: false }),
     ]);
     setSupporters(sup || []);
