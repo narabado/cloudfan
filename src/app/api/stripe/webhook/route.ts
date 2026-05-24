@@ -4,6 +4,13 @@ import { getStripe, getSupabaseAdmin } from "@/lib";
 
 export const runtime = "nodejs";
 
+const COL_NAME   = "\u540d\u524d";
+const COL_EMAIL  = "\u30e1\u30fc\u30eb";
+const COL_TIER   = "\u968e\u5c64";
+const COL_STATUS = "\u72b6\u6cc1";
+const COL_MSG    = "\u30e1\u30c3\u30bb\u30fc\u30b8";
+const VAL_ANON   = "\u533f\u540d";
+
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid") return;
 
@@ -25,20 +32,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const supabase = getSupabaseAdmin();
 
-  const insertPayload: Record<string, unknown> = {
-    '名前': isAnonymous ? '匿名' : supporterName,
-    'メール': supporterEmail,
-    '階層': tierName,
-    '状況': "approved",
-    total_amount: totalAmount,
-    'メッセージ': message,
-    project_id: projectId || null,
-    is_anonymous: isAnonymous,
-  };
+  const insertPayload: Record<string, unknown> = {};
+  insertPayload[COL_NAME]        = isAnonymous ? VAL_ANON : supporterName;
+  insertPayload[COL_EMAIL]       = supporterEmail;
+  insertPayload[COL_TIER]        = tierName;
+  insertPayload[COL_STATUS]      = "approved";
+  insertPayload["total_amount"]  = totalAmount;
+  insertPayload[COL_MSG]         = message;
+  insertPayload["project_id"]    = projectId || null;
+  insertPayload["is_anonymous"]  = isAnonymous;
 
   console.log("Inserting:", JSON.stringify(insertPayload));
 
-  const { error } = await supabase.from("supporters").insert(insertPayload);
+  const { error } = await supabase.from("supporters").insert(insertPayload as never);
   if (error) {
     console.error("Supabase insert error:", JSON.stringify(error));
   } else {
@@ -65,9 +71,9 @@ export async function POST(req: NextRequest) {
     const stripe = getStripe();
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Webhook signature error:", message);
-    return NextResponse.json({ error: `Webhook Error: ${message}` }, { status: 400 });
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("Webhook signature error:", msg);
+    return NextResponse.json({ error: "Webhook Error: " + msg }, { status: 400 });
   }
 
   console.log("Stripe event received:", event.type);
