@@ -14,6 +14,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const tierName = String(meta.tier_name || '');
   const message = String(meta.message || '');
   const supporterName = String(meta.supporter_name || '');
+  const supporterEmail = String(meta.supporter_email || '');
   const isAnonymous = String(meta.is_anonymous || 'false') === 'true';
 
   if (!projectId || !totalAmount) return;
@@ -22,11 +23,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const insertPayload: Record<string, any> = {
     project_id: projectId,
-    status: '承認',
-    total_amount: totalAmount,
+    status: 'approved',
+    amount: totalAmount,
     message,
     name: isAnonymous ? '匿名' : supporterName,
-    ['階層']: tierName,
+    email: supporterEmail,
+    tier: tierName,
+    is_anonymous: isAnonymous,
   };
 
   const { error } = await supabaseAdmin
