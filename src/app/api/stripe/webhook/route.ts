@@ -9,7 +9,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (session.payment_status !== 'paid') return;
 
   const meta = session.metadata || {};
-  const projectId = Number(meta.project_id || 0);
   const totalAmount = Number(meta.total_amount || 0);
   const tierName = String(meta.tier_name || '');
   const message = String(meta.message || '');
@@ -17,18 +16,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const supporterEmail = String(meta.supporter_email || '');
   const isAnonymous = String(meta.is_anonymous || 'false') === 'true';
 
-  if (!projectId || !totalAmount) return;
+  if (!totalAmount) return;
 
   const supabaseAdmin = getSupabaseAdmin();
 
   const insertPayload: Record<string, any> = {
-    project_id: projectId,
     status: 'approved',
-    amount: totalAmount,
+    total_amount: totalAmount,
     message,
     name: isAnonymous ? '匿名' : supporterName,
     email: supporterEmail,
-    tier: tierName,
+    plan: tierName,
     is_anonymous: isAnonymous,
   };
 
@@ -37,8 +35,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     .insert(insertPayload);
 
   if (error) {
+    console.error('Supabase insert error:', error.message);
     throw new Error(error.message);
   }
+  
+  console.log('Supporter inserted successfully:', supporterName);
 }
 
 export async function POST(req: NextRequest) {
@@ -62,8 +63,11 @@ export async function POST(req: NextRequest) {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid webhook signature';
+      console.error('Webhook signature error:', message);
       return NextResponse.json({ error: message }, { status: 400 });
     }
+
+    console.log('Webhook event received:', event.type);
 
     if (
       event.type === 'checkout.session.completed' ||
@@ -77,6 +81,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Stripe webhook handling failed';
+    console.error('Webhook error:', message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
