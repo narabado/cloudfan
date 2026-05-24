@@ -24,7 +24,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     name: supporterName,
     email: supporterEmail,
     tier: tierName,
-    status: "approved",
+    status: "pending",
     total_amount: totalAmount,
     message: message,
     project_id: projectId,
