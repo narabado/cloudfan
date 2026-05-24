@@ -33,18 +33,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const supabase = getSupabaseAdmin();
 
   const insertPayload: Record<string, unknown> = {};
-  insertPayload[COL_NAME]        = isAnonymous ? VAL_ANON : supporterName;
-  insertPayload[COL_EMAIL]       = supporterEmail;
-  insertPayload[COL_TIER]        = tierName;
-  insertPayload[COL_STATUS]      = "approved";
-  insertPayload["total_amount"]  = totalAmount;
-  insertPayload[COL_MSG]         = message;
-  insertPayload["project_id"]    = projectId || null;
-  insertPayload["is_anonymous"]  = isAnonymous;
+  insertPayload[COL_NAME]       = isAnonymous ? VAL_ANON : supporterName;
+  insertPayload[COL_EMAIL]      = supporterEmail;
+  insertPayload[COL_TIER]       = tierName;
+  insertPayload[COL_STATUS]     = "approved";
+  insertPayload["total_amount"] = totalAmount;
+  insertPayload[COL_MSG]        = message;
+  insertPayload["project_id"]   = projectId || null;
+  insertPayload["is_anonymous"] = isAnonymous;
 
   console.log("Inserting:", JSON.stringify(insertPayload));
 
-  const { error } = await supabase.from("supporters").insert(insertPayload as never);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from("supporters").insert(insertPayload);
   if (error) {
     console.error("Supabase insert error:", JSON.stringify(error));
   } else {
