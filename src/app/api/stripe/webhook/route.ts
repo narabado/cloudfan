@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
-const COL_NAME   = "\u540d\u524d";
+const COL_NAME   = "\u540d\u79f0";
 const COL_EMAIL  = "\u30e1\u30fc\u30eb";
 const COL_TIER   = "\u968e\u5c64";
 const COL_STATUS = "\u72b6\u6cc1";
