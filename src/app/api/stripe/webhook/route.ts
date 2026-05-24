@@ -20,19 +20,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (!totalAmount) { console.error("totalAmount is missing"); return; }
 
   const supabase = getSupabaseAdmin();
-  const insertPayload = {
-    name: isAnonymous ? "\u533f\u540d" : supporterName,
-    email: supporterEmail,
-    tier: tierName,
-    status: "approved",
-    total_amount: totalAmount,
-    message: message,
-    project_id: projectId || null,
-    is_anonymous: isAnonymous,
-  };
+  const p: Record<string, unknown> = {};
+  p["\u540d\u79f0"] = isAnonymous ? "\u533f\u540d" : supporterName;
+  p["\u30e1\u30fc\u30eb"] = supporterEmail;
+  p["\u968e\u5c64"] = tierName;
+  p["\u72b6\u6cc1"] = "approved";
+  p["total_amount"] = totalAmount;
+  p["message"] = message;
+  p["project_id"] = projectId || null;
+  p["is_anonymous"] = isAnonymous;
 
-  console.log("Inserting:", JSON.stringify(insertPayload));
-  const { error } = await (supabase as any).from("supporters").insert(insertPayload);
+  console.log("Inserting:", JSON.stringify(p));
+  const { error } = await (supabase as any).from("supporters").insert(p);
   if (error) console.error("Supabase insert error:", JSON.stringify(error));
   else console.log("Supabase insert success!");
 }
