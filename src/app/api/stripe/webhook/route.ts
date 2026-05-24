@@ -29,6 +29,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     message: message,
     project_id: projectId,
     is_anonymous: isAnonymous,
+    transfer_code: "",
   };
 
   console.log("挿入:", JSON.stringify(insertPayload));
@@ -69,3 +70,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true });
 }
+
