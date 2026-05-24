@@ -21,7 +21,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log(`handleCheckoutCompleted( totalAmount: ${totalAmount}, tierName: '${tierName}', projectId: ${projectId} )`);
 
   const insertPayload = {
-    name: isAnonymous ? "匿名" : supporterName,
+    name: supporterName,
     email: supporterEmail,
     tier: tierName,
     status: "approved",
@@ -70,4 +70,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true });
 }
+
 
