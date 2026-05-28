@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -477,6 +477,9 @@ export default function TopPage() {
         <div style={{ maxWidth: 900, margin: '16px auto 0',
           paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)',
           textAlign: 'center', fontSize: 12, opacity: 0.4 }}>
+          <div style={{ marginBottom: 8 }}>
+            <a href="/legal" style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, textDecoration: "underline" }}>特定商取引法に基づく表記</a>
+          </div>
           © 2025 CloudFan. All rights reserved.
         </div>
       </footer>
