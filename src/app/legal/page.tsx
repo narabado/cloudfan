@@ -46,6 +46,10 @@
             <th style={{ padding: "16px 12px", textAlign: "left", background: "#f9fafb", verticalAlign: "top" }}>返品・キャンセル</th>
             <td style={{ padding: "16px 12px" }}>支払い完了後のキャンセル・返金は原則承っておりません。ただし、プロジェクトが中止となった場合は全額返金いたします。</td>
           </tr>
+          <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
+            <th style={{ padding: "16px 12px", textAlign: "left", background: "#f9fafb", verticalAlign: "top" }}>追加手数料</th>
+            <td style={{ padding: "16px 12px" }}>なし（表示価格以外の手数料は一切かかりません）</td>
+          </tr>
           <tr>
             <th style={{ padding: "16px 12px", textAlign: "left", background: "#f9fafb", verticalAlign: "top" }}>動作環境</th>
             <td style={{ padding: "16px 12px" }}>最新バージョンの各種ブラウザ（Chrome / Safari / Firefox / Edge）</td>
